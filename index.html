@@ -3,15 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HabitFlow v2.0 — Suivi des Habitudes & Historique JSON</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- FontAwesome Icons -->
+  <title>HabitFlow v3.0 — Suivi des Habitudes & Persistance SQLite</title>
+  <!-- Styles locaux et polices -->
+  <link rel="stylesheet" href="./assets/css/fonts.css" />
+  <link rel="stylesheet" href="./assets/css/fontawesome.min.css" />
+  <!-- CDN FontAwesome fallback pour les icônes si besoin -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS Local (sans avertissement CDN) -->
+  <script src="./assets/js/tailwind.min.js"></script>
+  <!-- Chart.js Local -->
+  <script src="./assets/js/chart.min.js"></script>
+
+  <!-- Moteur SQLite WebAssembly & Données WASM (100% hors-ligne & compatible direct file:// sans CORS) -->
+  <script src="./assets/js/sql-wasm-data.js"></script>
+  <script src="./assets/js/sql-wasm.js"></script>
 
   <script>
     tailwind.config = {
@@ -64,7 +70,7 @@
 
 <body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col">
 
-  <!-- BARRE DE STATUT JSON & NAVIGATION PRINCIPALE -->
+  <!-- BARRE DE STATUT SQLITE & NAVIGATION PRINCIPALE -->
   <header class="sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
       <div class="flex flex-wrap items-center justify-between gap-4">
@@ -78,48 +84,51 @@
             <div class="flex items-center gap-2">
               <h1 class="font-display font-bold text-lg tracking-tight">HabitFlow</h1>
               <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                v2.0 JSON
+                v3.0 SQLite
               </span>
             </div>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Discipline quotidienne & archives hebdomadaires</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Base SQLite locale & discipline quotidienne</p>
           </div>
         </div>
 
-        <!-- Barre d'outils Fichier JSON Physique (Approche Hybride) -->
+        <!-- Barre d'outils Fichier SQLite Physique (Approche Web + Disque) -->
         <div class="flex flex-wrap items-center gap-2">
-          <!-- Indicateur d'état du stockage -->
-          <div id="storageStatusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" title="Les modifications sont gardées en mémoire locale tant qu'un fichier JSON physique n'est pas lié.">
+          <!-- Indicateur d'état du stockage SQLite -->
+          <button id="storageStatusBadge" onclick="handleBadgeClick()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 cursor-pointer hover:opacity-90 transition" title="Cliquez pour gérer la liaison de votre base SQLite">
             <span id="storageStatusDot" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
-            <span id="storageStatusText">Mémoire locale (Non lié)</span>
-          </div>
-
-          <!-- Lier / Créer un fichier JSON physique (File System Access API) -->
-          <button onclick="linkPhysicalJsonFile()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition" title="Ouvrir un fichier JSON existant et activer la sauvegarde directe sur le disque">
-            <i class="fa-solid fa-link"></i>
-            <span id="btnLinkText">Lier un fichier .json</span>
+            <span id="storageStatusText">Initialisation SQLite...</span>
           </button>
 
-          <button onclick="createNewPhysicalJsonFile()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition" title="Créer un nouveau fichier habitflow-data.json sur votre disque">
+          <!-- Lier / Créer un fichier SQLite physique sur disque -->
+          <button onclick="linkPhysicalSqliteFile()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition" title="Ouvrir un fichier .db existant sur votre disque et synchroniser en temps réel">
+            <i class="fa-solid fa-database"></i>
+            <span id="btnLinkText">Lier habits.db</span>
+          </button>
+
+          <button onclick="createNewPhysicalSqliteFile()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition" title="Créer un nouveau fichier .db sur votre disque">
             <i class="fa-solid fa-file-circle-plus text-emerald-500"></i>
-            <span>Nouveau .json</span>
+            <span>Nouveau .db</span>
           </button>
 
           <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-0.5"></div>
 
-          <!-- Import / Export Classique -->
-          <button onclick="exportJsonDownload()" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition" title="Télécharger une copie du fichier JSON">
+          <!-- Téléchargement / Export du .db -->
+          <button onclick="exportSqliteDownload()" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition" title="Télécharger une copie du fichier habits.db">
             <i class="fa-solid fa-download"></i>
-            <span class="hidden sm:inline">Exporter</span>
+            <span class="hidden sm:inline">Exporter .db</span>
           </button>
 
-          <label class="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition" title="Importer un fichier JSON depuis votre appareil">
-            <i class="fa-solid fa-upload"></i>
-            <span class="hidden sm:inline">Importer</span>
+          <!-- Migration depuis JSON -->
+          <label class="cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition" title="Importer ou migrer un fichier habitflow-data.json dans SQLite">
+            <i class="fa-solid fa-file-import text-amber-500"></i>
+            <span class="hidden sm:inline">Migrer JSON</span>
             <input type="file" id="importJsonInput" accept=".json,application/json" class="hidden" onchange="importJsonFile(event)" />
           </label>
 
-          <button onclick="openJsonInspector()" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition" title="Inspecter le contenu brut du JSON">
-            <i class="fa-solid fa-code"></i>
+          <!-- Console & Inspecteur SQLite -->
+          <button onclick="openSqlInspector()" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition" title="Ouvrir l'explorateur de tables et la console de requêtes SQL">
+            <i class="fa-solid fa-terminal text-emerald-500"></i>
+            <span class="hidden sm:inline">Console SQL</span>
           </button>
 
           <!-- Bouton Thème Clair/Sombre -->
@@ -148,226 +157,262 @@
           <div class="text-center min-w-[230px] sm:min-w-[270px]">
             <div class="flex items-center justify-center gap-2">
               <span id="weekNumberLabel" class="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Semaine --</span>
-              <span id="weekContextBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">En cours</span>
+              <span id="weekCurrentBadge" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">Actuelle</span>
             </div>
-            <h2 id="weekDateRangeLabel" class="font-display font-bold text-base sm:text-lg text-slate-800 dark:text-slate-100 mt-0.5">
-              --
-            </h2>
+            <div id="weekRangeLabel" class="text-sm font-bold text-slate-800 dark:text-slate-100 mt-0.5">-- au --</div>
           </div>
 
           <button onclick="changeWeek(1)" class="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-300 transition" title="Semaine suivante">
             <i class="fa-solid fa-chevron-right text-xs"></i>
           </button>
 
-          <button id="btnJumpCurrentWeek" onclick="jumpToCurrentWeek()" class="hidden px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition">
-            <i class="fa-solid fa-calendar-day mr-1"></i> Aujourd'hui
+          <button onclick="jumpToCurrentWeek()" class="ml-1 sm:ml-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition">
+            Aujourd'hui
           </button>
         </div>
 
-        <!-- Sélecteur de semaines archivées + Actions rapides -->
-        <div class="flex flex-wrap items-center gap-2.5">
-          <div class="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <i class="fa-solid fa-clock-rotate-left"></i>
-            <span>Archives :</span>
-            <select id="archiveWeekSelect" onchange="jumpToWeekKey(this.value)" class="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
-            </select>
+        <!-- Raccourcis Archives Récentes & Actions Rapides -->
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs text-slate-400 font-medium hidden lg:inline">Accès rapide :</span>
+          <div id="recentWeeksContainer" class="flex items-center gap-1.5">
+            <!-- Injecté dynamiquement par JS -->
           </div>
+          
+          <div class="h-4 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
-          <button onclick="openHabitModal()" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-600/20 transition">
-            <i class="fa-solid fa-plus"></i>
-            <span>Nouvelle Habitude</span>
+          <button onclick="clearCurrentWeekChecks()" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-500/10 transition" title="Décocher toutes les cases de la semaine affichée">
+            <i class="fa-solid fa-rotate-left mr-1"></i> Réinitialiser semaine
           </button>
         </div>
 
       </div>
     </section>
 
-    <!-- CARTES DE STATISTIQUES (KPIs) -->
+    <!-- SECTION 1 : TABLEAU DE BORD KPIs (STATISTIQUES DE LA SEMAINE) -->
     <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       
-      <!-- KPI 1 : Réussite de la semaine affichée -->
+      <!-- KPI 1 : Taux de Réussite Hebdo -->
       <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Taux de la Semaine</span>
-          <span id="kpiWeekBadge" class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">0%</span>
+        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+          <span>Taux de Réussite Semaine</span>
+          <div class="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+            <i class="fa-solid fa-chart-line text-xs"></i>
+          </div>
         </div>
         <div class="mt-3 flex items-baseline gap-2">
-          <span id="kpiWeekPercent" class="font-display text-3xl font-extrabold">0%</span>
-          <span id="kpiWeekFraction" class="text-xs text-slate-400">(0/0 objectifs)</span>
+          <span id="kpiWeekPercent" class="text-3xl font-extrabold font-display text-slate-900 dark:text-white">0%</span>
+          <span id="kpiWeekFraction" class="text-xs font-medium text-slate-400">(0/0 cibles)</span>
         </div>
-        <div class="mt-3 w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-          <div id="kpiWeekBar" class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500" style="width: 0%"></div>
+        <div class="mt-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+          <div id="kpiWeekBar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+        <div class="mt-2 text-[11px] text-slate-400 flex items-center justify-between">
+          <span>Discipline globale</span>
+          <span id="kpiWeekBadge" class="font-semibold text-emerald-500">En cours</span>
         </div>
       </div>
 
-      <!-- KPI 2 : Progression du jour actif -->
+      <!-- KPI 2 : Validés Aujourd'hui -->
       <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-        <div class="flex items-center justify-between">
-          <span id="kpiTodayTitle" class="text-xs font-semibold uppercase tracking-wider text-slate-400">Aujourd'hui</span>
-          <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
-            <i class="fa-solid fa-check-double text-sm"></i>
+        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+          <span id="kpiTodayTitle">Aujourd'hui</span>
+          <div class="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
+            <i class="fa-solid fa-calendar-check text-xs"></i>
           </div>
         </div>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span id="kpiTodayCount" class="font-display text-3xl font-extrabold">0 / 0</span>
-          <span class="text-xs text-slate-400">validés</span>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpiTodayCount" class="text-3xl font-extrabold font-display text-slate-900 dark:text-white">0 / 0</span>
         </div>
-        <p id="kpiTodaySub" class="mt-2 text-xs text-slate-500 dark:text-slate-400">Sélectionnez vos cases du jour</p>
+        <p id="kpiTodaySub" class="mt-3 text-xs text-slate-400">Objectifs validés aujourd'hui</p>
+        <div class="mt-2 text-[11px] text-slate-400 flex items-center justify-between">
+          <span>Focus quotidien</span>
+          <span class="text-blue-500 font-semibold">Jour J</span>
+        </div>
       </div>
 
-      <!-- KPI 3 : Série d'Abstinence / Globale (Multi-semaines) -->
+      <!-- KPI 3 : Meilleure Série Active (Multi-semaines) -->
       <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Meilleure Série Active</span>
-          <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
-            <i class="fa-solid fa-fire-flame-curved text-sm"></i>
+        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+          <span>Meilleure Série Continue</span>
+          <div class="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
+            <i class="fa-solid fa-fire text-xs"></i>
           </div>
         </div>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span id="kpiBestStreak" class="font-display text-3xl font-extrabold">0 j</span>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpiBestStreak" class="text-3xl font-extrabold font-display text-amber-500">0 j</span>
           <span class="text-xs text-slate-400">consécutifs</span>
         </div>
-        <p id="kpiBestStreakHabit" class="mt-2 text-xs text-slate-500 dark:text-slate-400 truncate">Sur l'ensemble des semaines</p>
+        <p id="kpiBestStreakHabit" class="mt-3 text-xs text-slate-400 truncate font-medium">Aucune habitude en cours</p>
+        <div class="mt-2 text-[11px] text-slate-400 flex items-center justify-between">
+          <span>Flamme de la discipline</span>
+          <span class="text-amber-500 font-semibold">Streak</span>
+        </div>
       </div>
 
-      <!-- KPI 4 : Cibles Hebdomadaires Atteintes -->
+      <!-- KPI 4 : Objectifs Hebdos Atteints -->
       <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Cibles Hebdo Atteintes</span>
-          <div class="w-8 h-8 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
-            <i class="fa-solid fa-trophy text-sm"></i>
+        <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-xs font-semibold">
+          <span>Objectifs Atteints</span>
+          <div class="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-500 flex items-center justify-center">
+            <i class="fa-solid fa-bullseye text-xs"></i>
           </div>
         </div>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span id="kpiGoalsMet" class="font-display text-3xl font-extrabold">0 / 0</span>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="kpiGoalsMet" class="text-3xl font-extrabold font-display text-slate-900 dark:text-white">0 / 0</span>
           <span class="text-xs text-slate-400">habitudes</span>
         </div>
-        <p id="kpiTopCategory" class="mt-2 text-xs text-slate-500 dark:text-slate-400 truncate">Catégorie dominante : --</p>
+        <p id="kpiTopCategory" class="mt-3 text-xs text-slate-400 truncate">Catégorie forte : --</p>
+        <div class="mt-2 text-[11px] text-slate-400 flex items-center justify-between">
+          <span>Score cible</span>
+          <span class="text-purple-500 font-semibold">Target</span>
+        </div>
       </div>
 
     </section>
 
-    <!-- FILTRES DE CATÉGORIES PERSONNALISABLES & RECHERCHE -->
-    <section class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm">
-      <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-        
-        <!-- Liste des Catégories + Bouton Gérer / Créer -->
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-          <div id="categoryFilterBar" class="flex items-center gap-1.5">
-            <!-- Injecté par JS -->
-          </div>
-          <button onclick="openCategoryModal()" class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-dashed border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-emerald-500 hover:text-emerald-500 transition">
-            <i class="fa-solid fa-folder-plus"></i>
-            <span>+ Catégorie</span>
-          </button>
-        </div>
+    <!-- SECTION 2 : GESTION DES CATÉGORIES & FILTRES -->
+    <section class="flex flex-wrap items-center justify-between gap-3">
+      <!-- Filtres Pilules -->
+      <div class="flex flex-wrap items-center gap-1.5" id="categoryPillsContainer">
+        <!-- Rendu JS : Tous, Abstinence, Santé, etc. -->
+      </div>
 
-        <!-- Recherche & Ajout Rapide -->
-        <div class="flex flex-wrap items-center gap-2">
-          <div class="relative flex-1 sm:flex-initial">
-            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-            <input
-              type="text"
-              id="searchHabitInput"
-              oninput="renderAll()"
-              placeholder="Filtrer une habitude..."
-              class="w-full sm:w-52 pl-8 pr-3 py-1.5 rounded-xl text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            />
-          </div>
+      <!-- Boutons d'Action : Gérer Catégories & Nouvelle Habitude -->
+      <div class="flex items-center gap-2">
+        <button onclick="openCategoryModal()" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 shadow-sm transition">
+          <i class="fa-solid fa-tags text-slate-400"></i>
+          <span>Gérer Catégories</span>
+        </button>
 
-          <button onclick="clearCurrentWeekChecks()" class="px-3 py-1.5 rounded-xl text-xs font-medium text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 transition" title="Réinitialiser uniquement les cases de la semaine affichée">
-            <i class="fa-solid fa-eraser mr-1"></i> Vider cette semaine
-          </button>
-        </div>
-
+        <button onclick="openHabitModal()" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm shadow-emerald-600/20 transition">
+          <i class="fa-solid fa-plus"></i>
+          <span>Nouvelle Habitude</span>
+        </button>
       </div>
     </section>
 
-    <!-- GRILLE HEBDOMADAIRE INTERACTIVE -->
+    <!-- SECTION 3 : TABLEAU HEBDOMADAIRE COMPLET -->
     <section class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+      <!-- En-tête de la grille & Recherche rapide -->
+      <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="font-display font-bold text-base text-slate-900 dark:text-slate-100">Matrice de Suivi Hebdomadaire</h2>
+          <p class="text-xs text-slate-400">Cochez vos réussites du jour. Les changements sont immédiatement enregistrés dans SQLite.</p>
+        </div>
+
+        <div class="relative w-full sm:w-64">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400"></i>
+          <input
+            type="text"
+            id="searchHabitInput"
+            oninput="renderHabitTable()"
+            placeholder="Filtrer une habitude..."
+            class="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/80 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-slate-100 placeholder-slate-400"
+          />
+        </div>
+      </div>
+
+      <!-- Table responsive -->
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse">
           <thead>
-            <tr id="tableHeaderRow" class="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              <!-- Injecté dynamiquement avec les vraies dates de la semaine -->
+            <tr id="tableHeaderRow" class="border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50/50 dark:bg-slate-900/50">
+              <!-- Colonnes injectées par JS : Habitude, Lun, Mar... Dim, Progression, Streak, Actions -->
             </tr>
           </thead>
-          <tbody id="habitTableBody" class="divide-y divide-slate-200/70 dark:divide-slate-800/70 text-sm">
+          <tbody id="habitTableBody" class="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
             <!-- Injecté par JS -->
           </tbody>
         </table>
       </div>
 
-      <!-- État vide -->
-      <div id="emptyStateBox" class="hidden py-12 text-center">
-        <div class="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto text-slate-400 mb-3">
-          <i class="fa-solid fa-clipboard-list text-xl"></i>
+      <!-- Message si aucune habitude -->
+      <div id="emptyStateBox" class="hidden p-12 text-center">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center text-xl mb-3">
+          <i class="fa-solid fa-clipboard-list"></i>
         </div>
-        <h3 class="font-display font-bold text-base">Aucune habitude à afficher</h3>
-        <p class="text-xs text-slate-400 mt-1 max-w-md mx-auto">Ajoutez votre première habitude (comme votre objectif d'abstinence) ou changez de filtre de catégorie.</p>
-        <button onclick="openHabitModal()" class="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition">
-          <i class="fa-solid fa-plus"></i> Créer une habitude
+        <h3 class="font-display font-bold text-slate-800 dark:text-slate-200 text-sm">Aucune habitude trouvée</h3>
+        <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Créez votre première habitude pour démarrer votre routine de discipline quotidienne.</p>
+        <button onclick="openHabitModal()" class="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white">
+          <i class="fa-solid fa-plus mr-1"></i> Ajouter une habitude
         </button>
       </div>
     </section>
 
-    <!-- GRAPHIQUES DE PROGRESSION (HEBDOMADAIRE + HISTORIQUE MULTI-SEMAINES + CATÉGORIES) -->
+    <!-- SECTION 4 : ANALYSES & GRAPHIQUES AVANCÉS (CHART.JS) -->
     <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       
-      <!-- Graphique 1 : Progression Quotidienne de la Semaine Affichée -->
-      <div class="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <!-- Graphique 1 : Évolution Jour par Jour de la Semaine -->
+      <div class="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
           <div>
-            <h3 class="font-display font-bold text-base">Progression de la Semaine Sélectionnée</h3>
-            <p class="text-xs text-slate-400">Réalisations jour par jour du lundi au dimanche</p>
+            <h3 class="font-display font-bold text-sm text-slate-900 dark:text-slate-100">Dynamique Quotidienne de la Semaine</h3>
+            <p class="text-xs text-slate-400">Total d'habitudes accomplies jour par jour</p>
           </div>
-          <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-            <button id="btnChartModePct" onclick="setChartMode('percent')" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 shadow-sm text-emerald-600 dark:text-emerald-400">
-              Pourcentage (%)
+          <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl text-xs">
+            <button onclick="setChartMode('percent')" id="btnChartModePercent" class="px-2.5 py-1 rounded-lg font-semibold bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm transition">
+              % Taux
             </button>
-            <button id="btnChartModeCount" onclick="setChartMode('count')" class="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400">
-              Volume (Nb)
+            <button onclick="setChartMode('count')" id="btnChartModeCount" class="px-2.5 py-1 rounded-lg font-medium text-slate-500 dark:text-slate-400 transition">
+              Nombre
             </button>
           </div>
         </div>
-        <div class="relative h-64 w-full flex-1">
-          <canvas id="weeklyChartCanvas"></canvas>
+        <div class="h-64 relative">
+          <canvas id="weeklyChart"></canvas>
         </div>
       </div>
 
-      <!-- Graphique 2 : Répartition par Catégorie & Comparatif des Semaines -->
-      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
+      <!-- Graphique 2 : Répartition par Catégorie -->
+      <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
         <div>
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="font-display font-bold text-base">Équilibre par Catégorie</h3>
-              <p class="text-xs text-slate-400">Validation sur la semaine affichée</p>
-            </div>
-            <button onclick="openCategoryModal()" class="text-xs text-emerald-500 hover:underline font-medium">
-              Gérer
-            </button>
-          </div>
-          <div class="relative h-44 w-full">
-            <canvas id="categoryChartCanvas"></canvas>
-          </div>
+          <h3 class="font-display font-bold text-sm text-slate-900 dark:text-slate-100">Répartition par Catégorie</h3>
+          <p class="text-xs text-slate-400">Complétions par domaine sur la semaine</p>
         </div>
-
-        <!-- Mini Historique des 4 dernières semaines -->
-        <div class="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5">
-            Comparatif des Semaines Récentes
-          </h4>
-          <div id="multiWeekHistoryList" class="space-y-2">
-            <!-- Injecté par JS -->
-          </div>
+        <div class="h-64 relative flex items-center justify-center">
+          <canvas id="categoryChart"></canvas>
         </div>
       </div>
 
     </section>
 
+    <!-- SECTION 5 : COMPARATEUR HISTORIQUE MULTI-SEMAINES -->
+    <section class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h3 class="font-display font-bold text-sm text-slate-900 dark:text-slate-100">Comparateur Historique Multi-Semaines</h3>
+          <p class="text-xs text-slate-400">Vue d'ensemble de la régularité sur les 8 dernières semaines enregistrées dans SQLite</p>
+        </div>
+        <div class="text-xs text-slate-400 font-medium">
+          Source : <span class="text-emerald-500 font-semibold">Table SQLite <code>logs</code></span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3" id="multiWeekComparisonGrid">
+        <!-- Injecté par JS : cartes rétrospectives des semaines passées -->
+      </div>
+    </section>
+
   </main>
 
-  <!-- MODALE 1 : CRÉER / MODIFIER UNE HABITUDE -->
+  <!-- PIED DE PAGE -->
+  <footer class="border-t border-slate-200 dark:border-slate-800 py-6 text-center text-xs text-slate-400">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-database text-emerald-500"></i>
+        <span>Stockage <strong>SQLite 3</strong> (WebAssembly & Local File System)</span>
+      </div>
+      <div>
+        HabitFlow v3.0 — Vos données restent 100% privées sur votre machine
+      </div>
+    </div>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- MODALES DE L'APPLICATION -->
+  <!-- ========================================================================= -->
+
+  <!-- MODALE 1 : NOUVELLE / MODIFIER HABITUDE -->
   <div id="habitModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/60 modal-backdrop">
     <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5">
       <div class="flex items-center justify-between">
@@ -377,131 +422,148 @@
         </button>
       </div>
 
-      <form id="habitForm" onsubmit="saveHabitFromModal(event)" class="space-y-4">
+      <form onsubmit="saveHabitFromModal(event)" class="space-y-4">
         <input type="hidden" id="habitIdInput" />
-
-        <!-- Choix du Type : Action vs Abstinence -->
-        <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Nature de l'objectif</label>
-          <div class="grid grid-cols-2 gap-2.5">
-            <button type="button" id="typeBtnAbstinence" onclick="selectHabitType('abstinence')" class="flex items-center gap-2.5 p-3 rounded-xl border-2 text-left transition">
-              <div class="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                <i class="fa-solid fa-shield-halved"></i>
-              </div>
-              <div>
-                <div class="text-xs font-bold">Abstinence</div>
-                <div class="text-[11px] text-slate-400">Tenir bon (7j/7)</div>
-              </div>
-            </button>
-
-            <button type="button" id="typeBtnAction" onclick="selectHabitType('action')" class="flex items-center gap-2.5 p-3 rounded-xl border-2 text-left transition">
-              <div class="w-9 h-9 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
-                <i class="fa-solid fa-bolt"></i>
-              </div>
-              <div>
-                <div class="text-xs font-bold">Action Positive</div>
-                <div class="text-[11px] text-slate-400">Pratique régulière</div>
-              </div>
-            </button>
-          </div>
-        </div>
 
         <!-- Nom de l'habitude -->
         <div>
-          <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Intitulé de l'habitude</label>
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Intitulé de l'habitude / de l'abstinence *</label>
           <input
             type="text"
             id="habitNameInput"
             required
-            placeholder="Ex: Zéro sucre raffiné, Méditation 10 min..."
-            class="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            placeholder="Ex: Pas d'alcool, 30 min Sport, Lecture du soir..."
+            class="w-full px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>
 
-        <!-- Catégorie (avec création rapide intégrée) -->
+        <!-- Type d'Habitude (Action Positive vs Abstinence / Discipline) -->
         <div>
-          <div class="flex items-center justify-between mb-1.5">
-            <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">Catégorie</label>
-            <button type="button" onclick="toggleQuickCategoryForm()" class="text-xs font-semibold text-emerald-500 hover:underline">
-              + Créer une nouvelle catégorie
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Type d'engagement</label>
+          <div class="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onclick="selectHabitType('abstinence')"
+              id="typeBtnAbstinence"
+              class="flex items-center gap-2.5 p-3 rounded-xl border-2 border-emerald-500 bg-emerald-500/5 text-left transition"
+            >
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                <i class="fa-solid fa-shield-halved"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Abstinence</div>
+                <div class="text-[10px] text-slate-400">Zéro écart / Sobriété</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onclick="selectHabitType('action')"
+              id="typeBtnAction"
+              class="flex items-center gap-2.5 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-800 text-left opacity-70 transition"
+            >
+              <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                <i class="fa-solid fa-bolt"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-slate-800 dark:text-slate-100">Action Positive</div>
+                <div class="text-[10px] text-slate-400">Activité quotidienne</div>
+              </div>
             </button>
           </div>
-          <select
-            id="habitCategorySelect"
-            class="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          ></select>
+        </div>
 
-          <!-- Mini-formulaire de création rapide de catégorie -->
-          <div id="quickCategoryBox" class="hidden mt-2.5 p-3 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 space-y-2.5">
-            <div class="text-xs font-semibold text-slate-500 dark:text-slate-300">Nouvelle catégorie rapide :</div>
+        <!-- Catégorie & Cible Hebdo -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">Catégorie</label>
+              <button type="button" onclick="toggleQuickCategoryForm()" class="text-[11px] text-emerald-500 hover:underline">+ Nouvelle</button>
+            </div>
+            <select
+              id="habitCategorySelect"
+              class="w-full px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <!-- Rempli dynamiquement -->
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Cible hebdomadaire</label>
             <div class="flex items-center gap-2">
-              <input type="text" id="quickCatName" placeholder="Nom (ex: Sobriété, Spirituel...)" class="flex-1 px-2.5 py-1.5 rounded-lg text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700" />
-              <input type="color" id="quickCatColor" value="#10b981" class="w-8 h-8 rounded cursor-pointer border-0 bg-transparent" />
-              <button type="button" onclick="saveQuickCategory()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500">
-                Ajouter
-              </button>
+              <input
+                type="range"
+                id="habitTargetInput"
+                min="1"
+                max="7"
+                value="7"
+                oninput="document.getElementById('habitTargetLabel').textContent = this.value + ' jour(s) / 7'"
+                class="flex-1 accent-emerald-500"
+              />
+              <span id="habitTargetLabel" class="text-xs font-bold text-emerald-500 min-w-[70px] text-right">7 jours / 7</span>
             </div>
           </div>
         </div>
 
-        <!-- Fréquence Cible & Couleur -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <!-- Formulaire création rapide catégorie (repliable) -->
+        <div id="quickCategoryBox" class="hidden p-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Ajout rapide de catégorie</div>
+          <div class="flex items-center gap-2">
+            <input type="text" id="quickCatName" placeholder="Nom de catégorie..." class="flex-1 px-3 py-1.5 rounded-lg text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700" />
+            <input type="color" id="quickCatColor" value="#3b82f6" class="w-8 h-8 rounded-lg cursor-pointer border-0 bg-transparent" />
+            <button type="button" onclick="saveQuickCategory()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white">Créer</button>
+          </div>
+        </div>
+
+        <!-- Couleur & Icône -->
+        <div class="grid grid-cols-2 gap-3">
           <div>
-            <div class="flex justify-between text-xs mb-1.5">
-              <span class="font-semibold uppercase tracking-wider text-slate-400">Cible Hebdomadaire</span>
-              <span id="habitTargetLabel" class="font-bold text-emerald-500">7 jours / 7</span>
-            </div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Couleur</label>
             <input
-              type="range"
-              id="habitTargetInput"
-              min="1"
-              max="7"
-              value="7"
-              oninput="document.getElementById('habitTargetLabel').textContent = this.value + ' jour' + (this.value > 1 ? 's' : '') + ' / 7'"
-              class="w-full accent-emerald-500 cursor-pointer"
+              type="color"
+              id="habitColorInput"
+              value="#10b981"
+              class="w-full h-9 rounded-xl cursor-pointer border-0 bg-transparent"
             />
           </div>
 
           <div>
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">Couleur & Icône</label>
-            <div class="flex items-center gap-2">
-              <input type="color" id="habitColorInput" value="#10b981" class="w-9 h-9 rounded-lg cursor-pointer border-0 bg-transparent" />
-              <select id="habitIconSelect" class="flex-1 px-2.5 py-2 rounded-xl text-xs bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                <option value="fa-shield-halved">🛡️ Bouclier (Abstinence)</option>
-                <option value="fa-ban">🚫 Zéro écart</option>
-                <option value="fa-fire-flame-curved">🔥 Flamme / Discipline</option>
-                <option value="fa-dumbbell">🏋️ Sport & Force</option>
-                <option value="fa-book-open">📖 Lecture & Étude</option>
-                <option value="fa-brain">🧠 Mental & Méditation</option>
-                <option value="fa-droplet">💧 Hydratation</option>
-                <option value="fa-bed">🌙 Sommeil</option>
-                <option value="fa-laptop-code">💻 Code & Projet</option>
-                <option value="fa-leaf">🌿 Bien-être</option>
-              </select>
-            </div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Icône</label>
+            <select id="habitIconSelect" class="w-full px-3.5 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="fa-shield-halved">🛡️ Bouclier (Abstinence)</option>
+              <option value="fa-heart-pulse">❤️ Cœur / Santé</option>
+              <option value="fa-brain">🧠 Cerveau / Focus</option>
+              <option value="fa-laptop-code">💻 Code / Projets</option>
+              <option value="fa-dumbbell">🏋️ Haltère / Fitness</option>
+              <option value="fa-person-running">🏃 Course à pied</option>
+              <option value="fa-book-open">📖 Lecture</option>
+              <option value="fa-bed">😴 Sommeil & Repos</option>
+              <option value="fa-droplet">💧 Eau / Hydratation</option>
+              <option value="fa-apple-whole">🍏 Nutrition saine</option>
+              <option value="fa-fire">🔥 Discipline brute</option>
+              <option value="fa-star">⭐ Étoile</option>
+            </select>
           </div>
         </div>
 
+        <!-- Boutons d'action modale -->
         <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-          <button type="button" onclick="closeHabitModal()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <button type="button" onclick="closeHabitModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300">
             Annuler
           </button>
-          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20">
-            Enregistrer
+          <button type="submit" class="px-5 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm">
+            Enregistrer dans SQLite
           </button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- MODALE 2 : GESTIONNAIRE DE CATÉGORIES PERSONNALISÉES -->
+  <!-- MODALE 2 : GESTIONNAIRE DES CATÉGORIES -->
   <div id="categoryModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/60 modal-backdrop">
-    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between">
-        <div>
-          <h3 class="font-display font-bold text-lg">Catégories Personnalisées</h3>
-          <p class="text-xs text-slate-400">Créez ou organisez vos propres domaines</p>
-        </div>
+        <h3 class="font-display font-bold text-lg">Gestion des Catégories</h3>
         <button onclick="closeCategoryModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-400">
           <i class="fa-solid fa-xmark"></i>
         </button>
@@ -509,7 +571,7 @@
 
       <!-- Formulaire d'ajout de catégorie -->
       <form onsubmit="addCategoryFromModal(event)" class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 space-y-3">
-        <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Créer une catégorie</div>
+        <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Créer une catégorie SQLite</div>
         <div class="flex items-center gap-2">
           <input
             type="text"
@@ -525,7 +587,8 @@
             <option value="fa-shield-halved">🛡️ Bouclier / Abstinence</option>
             <option value="fa-heart-pulse">❤️ Santé & Vitalité</option>
             <option value="fa-brain">🧠 Mental & Esprit</option>
-            <option value="fa-briefcase">💼 Travail & Projets</option>
+            <option value="fa-laptop-code">💻 Projets & Code</option>
+            <option value="fa-briefcase">💼 Travail & Affaires</option>
             <option value="fa-dumbbell">🏋️ Sport</option>
             <option value="fa-book">📚 Apprentissage</option>
             <option value="fa-coins">🪙 Finances</option>
@@ -550,28 +613,105 @@
     </div>
   </div>
 
-  <!-- MODALE 3 : INSPECTEUR DU FICHIER JSON BRUT -->
-  <div id="jsonInspectorModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/60 modal-backdrop">
-    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4">
+  <!-- MODALE 3 : CONSOLE & EXPLORATEUR SQLITE (habits.db) -->
+  <div id="sqlInspectorModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-slate-950/60 modal-backdrop">
+    <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
       <div class="flex items-center justify-between">
-        <div>
-          <h3 class="font-display font-bold text-lg">Structure du Fichier JSON</h3>
-          <p class="text-xs text-slate-400">Aperçu temps réel des données stockées (catégories, habitudes et historique par semaine)</p>
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+            <i class="fa-solid fa-database"></i>
+          </div>
+          <div>
+            <h3 class="font-display font-bold text-lg">Console & Explorateur SQLite</h3>
+            <p class="text-xs text-slate-400">Base physique : <code id="sqlModalDbName" class="text-emerald-500">habits.db</code></p>
+          </div>
         </div>
-        <button onclick="closeJsonInspector()" class="w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-400">
+        <button onclick="closeSqlInspector()" class="w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-400">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
 
-      <pre id="jsonInspectorPre" class="p-4 rounded-xl bg-slate-950 text-emerald-400 text-xs overflow-auto max-h-96 font-mono border border-slate-800"></pre>
+      <!-- Onglets : Tables & Données / Console SQL / Export SQL Dump -->
+      <div class="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button id="tabBtnTables" onclick="switchSqlTab('tables')" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+          <i class="fa-solid fa-table-list mr-1"></i> Tables & Données
+        </button>
+        <button id="tabBtnQuery" onclick="switchSqlTab('query')" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200">
+          <i class="fa-solid fa-terminal mr-1"></i> Exécuter une Requête SQL
+        </button>
+        <button id="tabBtnDump" onclick="switchSqlTab('dump')" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200">
+          <i class="fa-solid fa-file-code mr-1"></i> Dump SQL (.sql)
+        </button>
+      </div>
 
-      <div class="flex items-center justify-between pt-2">
-        <span class="text-xs text-slate-400">Astuce : liez un fichier <code>.json</code> en haut pour écrire directement sur votre disque.</span>
-        <div class="flex items-center gap-2">
-          <button onclick="copyRawJson()" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700">
-            <i class="fa-regular fa-copy mr-1"></i> Copier le JSON
+      <!-- VUE 1 : TABLES & DONNÉES -->
+      <div id="sqlViewTables" class="flex-1 overflow-hidden flex flex-col space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2" id="sqlTableSelectorPills">
+            <!-- Boutons de tables injectés par JS (habits, logs, categories, settings) -->
+          </div>
+          <span id="sqlTableCountLabel" class="text-xs font-medium text-slate-400">0 enregistrement(s)</span>
+        </div>
+        <div class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead id="sqlTableThead" class="sticky top-0 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-[11px] font-bold text-slate-500">
+            </thead>
+            <tbody id="sqlTableTbody" class="divide-y divide-slate-200 dark:divide-slate-800 font-mono text-[11px]">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- VUE 2 : CONSOLE DE REQUÊTES SQL -->
+      <div id="sqlViewQuery" class="hidden flex-1 flex-col space-y-3 overflow-hidden">
+        <div class="flex items-center justify-between">
+          <div class="text-xs font-semibold text-slate-400">Requête SQL personnalisée :</div>
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11px] text-slate-400">Exemples :</span>
+            <button onclick="setQueryExample('SELECT * FROM habits')" class="text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:text-emerald-500">habits</button>
+            <button onclick="setQueryExample('SELECT * FROM logs ORDER BY date DESC LIMIT 20')" class="text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:text-emerald-500">derniers logs</button>
+            <button onclick="setQueryExample('SELECT h.name, count(l.date) as faits FROM habits h LEFT JOIN logs l ON h.id = l.habit_id WHERE l.completed = 1 GROUP BY h.id')" class="text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:text-emerald-500">stats/hab</button>
+          </div>
+        </div>
+        <textarea
+          id="customSqlTextarea"
+          rows="3"
+          placeholder="Tapez votre requête SQL ici (ex: SELECT * FROM habits)..."
+          class="w-full p-3 rounded-xl bg-slate-950 font-mono text-xs text-emerald-400 border border-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        >SELECT * FROM habits;</textarea>
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] text-slate-400">Raccourci : <code>Ctrl + Entrée</code> pour exécuter</span>
+          <button onclick="runCustomQuery()" class="px-4 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm">
+            <i class="fa-solid fa-play mr-1"></i> Exécuter
           </button>
-          <button onclick="closeJsonInspector()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white">
+        </div>
+        <!-- Résultats de la requête -->
+        <div id="customQueryResultBox" class="flex-1 overflow-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 p-2 text-xs">
+          <div class="text-slate-400 text-center py-6">Les résultats de votre requête s'afficheront ici.</div>
+        </div>
+      </div>
+
+      <!-- VUE 3 : DUMP SQL -->
+      <div id="sqlViewDump" class="hidden flex-1 flex-col space-y-3 overflow-hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-slate-400">Instructions SQL de création et d'insertion (compatible SQLite / PostgreSQL / MySQL)</span>
+          <button onclick="copySqlDump()" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200">
+            <i class="fa-regular fa-copy mr-1"></i> Copier
+          </button>
+        </div>
+        <pre id="sqlDumpPre" class="flex-1 p-3 rounded-xl bg-slate-950 text-emerald-400 text-xs overflow-auto font-mono border border-slate-800 max-h-72"></pre>
+      </div>
+
+      <!-- Pied de la modale SQL -->
+      <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
+        <div class="text-xs text-slate-400">
+          <i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> SQLite WASM v3.45+
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="exportSqliteDownload()" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700">
+            <i class="fa-solid fa-download mr-1"></i> Télécharger .db
+          </button>
+          <button onclick="closeSqlInspector()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white">
             Fermer
           </button>
         </div>
@@ -590,16 +730,14 @@
     const DAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
     const MONTH_NAMES = ['Jan.', 'Fév.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'];
 
-    // Retourne le lundi de la semaine d'une date donnée (à 00:00 heure locale)
     function getMondayOfDate(d) {
       const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-      const day = date.getDay(); // 0 = Dimanche, 1 = Lundi...
+      const day = date.getDay();
       const diff = day === 0 ? -6 : 1 - day;
       date.setDate(date.getDate() + diff);
       return date;
     }
 
-    // Formate une Date en clé locale YYYY-MM-DD sans décalage UTC
     function formatYMD(date) {
       const y = date.getFullYear();
       const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -607,20 +745,17 @@
       return `${y}-${m}-${d}`;
     }
 
-    // Parse une clé YYYY-MM-DD en Date locale
     function parseYMD(ymdStr) {
       const [y, m, d] = ymdStr.split('-').map(Number);
       return new Date(y, m - 1, d);
     }
 
-    // Ajoute N jours à une date
     function addDays(date, days) {
       const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
       copy.setDate(copy.getDate() + days);
       return copy;
     }
 
-    // Calcule le numéro de semaine ISO
     function getISOWeekNumber(d) {
       const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
       const dayNum = date.getUTCDay() || 7;
@@ -634,24 +769,158 @@
     const prevWeekMondayKey = formatYMD(addDays(getMondayOfDate(todayDate), -7));
 
     /*************************************************************************
-     * 2. ÉTAT DE L'APPLICATION & DONNÉES INITIALES (AVEC HISTORIQUE)
+     * 2. MOTEUR INDEXEDDB (CACHE LOCAL & PERSISTANCE DU HANDLE FICHIER)
      *************************************************************************/
-    const CACHE_MIRROR_KEY = 'habitflow_v2_json_mirror';
-    let fileHandle = null; // Référence FileSystemFileHandle pour écriture directe sur disque
-    let selectedWeekKey = currentWeekMondayKey; // Semaine actuellement consultée
+    const IDB_NAME = 'habitflow_sqlite_store';
+    const IDB_STORE = 'app_state';
+
+    function openIDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = () => {
+          req.result.createObjectStore(IDB_STORE);
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function idbGet(key) {
+      try {
+        const db = await openIDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(IDB_STORE, 'readonly');
+          const store = tx.objectStore(IDB_STORE);
+          const req = store.get(key);
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function idbSet(key, val) {
+      try {
+        const db = await openIDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(IDB_STORE, 'readwrite');
+          const store = tx.objectStore(IDB_STORE);
+          const req = store.put(val, key);
+          req.onsuccess = () => resolve();
+          req.onerror = () => reject(req.error);
+        });
+      } catch (e) {
+        console.warn('Erreur idbSet', e);
+      }
+    }
+
+    /*************************************************************************
+     * 3. MOTEUR SQLITE (sql.js WASM + LIAISON DISQUE PHYSIQUE)
+     *************************************************************************/
+    let SQL = null;
+    let sqliteDb = null;
+    let fileHandle = null;
+    let selectedWeekKey = currentWeekMondayKey;
     let activeCategoryFilter = 'all';
     let currentHabitType = 'abstinence';
     let chartMode = 'percent';
     let weeklyChartInstance = null;
     let categoryChartInstance = null;
 
+    // État dérivé pour le rendu de l'interface
+    let appData = {
+      version: '3.0 SQLite',
+      updatedAt: new Date().toISOString(),
+      settings: { theme: 'dark' },
+      categories: [],
+      habits: [],
+      history: {}
+    };
+
+    // Décodage du binaire WebAssembly depuis le module autonome (évite tout appel à fetch / CORS file://)
+    function getWasmBinary() {
+      if (typeof window !== 'undefined' && window.SQL_WASM_BASE64) {
+        try {
+          const binStr = atob(window.SQL_WASM_BASE64);
+          const len = binStr.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binStr.charCodeAt(i);
+          }
+          return bytes.buffer;
+        } catch (e) {
+          console.warn('Erreur décodage SQL_WASM_BASE64 :', e);
+        }
+      }
+      return null;
+    }
+
+    // Initialisation du moteur sql.js (WASM en mémoire direct, zéro requête réseau, zéro erreur CORS)
+    async function getSqlJsEngine() {
+      if (SQL) return SQL;
+      try {
+        const wasmBinary = getWasmBinary();
+        if (wasmBinary) {
+          SQL = await initSqlJs({ wasmBinary });
+          return SQL;
+        }
+        // Fallback local ou CDN si sql-wasm-data.js n'était pas chargé
+        SQL = await initSqlJs({
+          locateFile: file => './assets/js/' + file
+        });
+        return SQL;
+      } catch (errLocal) {
+        console.warn('Bascule CDN de secours pour sql-wasm.wasm :', errLocal);
+        SQL = await initSqlJs({
+          locateFile: file => 'https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.12.0/' + file
+        });
+        return SQL;
+      }
+    }
+
+    // Schéma SQL standard de l'application
+    function initSqliteSchema(db) {
+      db.run(`
+        CREATE TABLE IF NOT EXISTS categories (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          color TEXT NOT NULL,
+          icon TEXT NOT NULL,
+          position INTEGER DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS habits (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL CHECK(type IN ('action', 'abstinence')),
+          category_id TEXT REFERENCES categories(id) ON DELETE SET NULL,
+          target INTEGER NOT NULL DEFAULT 7,
+          color TEXT NOT NULL,
+          icon TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          archived INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS logs (
+          habit_id TEXT NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+          date TEXT NOT NULL,
+          completed INTEGER NOT NULL CHECK(completed IN (0, 1)),
+          PRIMARY KEY (habit_id, date)
+        );
+
+        CREATE TABLE IF NOT EXISTS settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL
+        );
+      `);
+    }
+
+    // Données initiales par défaut si la base est vierge
     function getDefaultData() {
       return {
-        version: '2.0',
-        updatedAt: new Date().toISOString(),
-        settings: {
-          theme: 'dark'
-        },
+        version: '3.0',
+        settings: { theme: 'dark' },
         categories: [
           { id: 'cat_abstinence', name: 'Abstinence & Sobriété', color: '#10b981', icon: 'fa-shield-halved' },
           { id: 'cat_sante', name: 'Santé & Énergie', color: '#3b82f6', icon: 'fa-heart-pulse' },
@@ -700,7 +969,6 @@
             createdAt: prevWeekMondayKey
           }
         ],
-        // Historique indexé par la date du lundi de chaque semaine (YYYY-MM-DD)
         history: {
           [prevWeekMondayKey]: {
             'hab_abstinence_1': [true, true, true, true, true, true, true],
@@ -718,24 +986,116 @@
       };
     }
 
-    let appData = loadInitialData();
-
-    function loadInitialData() {
+    // Injecter un objet de données (ex: JSON) dans SQLite
+    function importJsonIntoSQLite(jsonData) {
+      if (!sqliteDb) return;
+      sqliteDb.run('BEGIN TRANSACTION;');
       try {
-        const raw = localStorage.getItem(CACHE_MIRROR_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && Array.isArray(parsed.habits) && Array.isArray(parsed.categories) && parsed.history) {
-            return parsed;
+        if (jsonData.settings) {
+          for (const [k, v] of Object.entries(jsonData.settings)) {
+            sqliteDb.run('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [k, typeof v === 'object' ? JSON.stringify(v) : String(v)]);
           }
         }
+
+        if (Array.isArray(jsonData.categories)) {
+          for (const cat of jsonData.categories) {
+            sqliteDb.run('INSERT OR REPLACE INTO categories (id, name, color, icon, position) VALUES (?, ?, ?, ?, ?)',
+              [cat.id, cat.name, cat.color, cat.icon, cat.position || 0]);
+          }
+        }
+
+        if (Array.isArray(jsonData.habits)) {
+          for (const h of jsonData.habits) {
+            sqliteDb.run('INSERT OR REPLACE INTO habits (id, name, type, category_id, target, color, icon, created_at, archived) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)',
+              [h.id, h.name, h.type || 'action', h.categoryId, h.target || 7, h.color, h.icon, h.createdAt || prevWeekMondayKey]);
+          }
+        }
+
+        if (jsonData.history && typeof jsonData.history === 'object') {
+          for (const [weekMonday, habitLogs] of Object.entries(jsonData.history)) {
+            for (const [habitId, checks] of Object.entries(habitLogs)) {
+              if (Array.isArray(checks)) {
+                checks.forEach((val, dayIdx) => {
+                  if (val) {
+                    const dateStr = formatYMD(addDays(parseYMD(weekMonday), dayIdx));
+                    sqliteDb.run('INSERT OR REPLACE INTO logs (habit_id, date, completed) VALUES (?, ?, 1)', [habitId, dateStr]);
+                  }
+                });
+              }
+            }
+          }
+        }
+
+        sqliteDb.run('COMMIT;');
       } catch (e) {
-        console.warn('Lecture du cache miroir impossible, chargement des données initiales.', e);
+        sqliteDb.run('ROLLBACK;');
+        console.error('Erreur importation JSON dans SQLite :', e);
+        throw e;
       }
-      return getDefaultData();
     }
 
-    // S'assure que la semaine sélectionnée possède un tableau de 7 booléens pour chaque habitude
+    // Synchroniser l'état réactif de l'application depuis la base SQLite
+    function syncStateFromSQLite() {
+      if (!sqliteDb) return;
+
+      // 1. Settings
+      const settingsRes = sqliteDb.exec('SELECT key, value FROM settings');
+      const settings = { theme: 'dark' };
+      if (settingsRes.length > 0 && settingsRes[0].values) {
+        settingsRes[0].values.forEach(([k, v]) => {
+          try { settings[k] = JSON.parse(v); } catch (_) { settings[k] = v; }
+        });
+      }
+
+      // 2. Categories
+      const catRes = sqliteDb.exec('SELECT id, name, color, icon, position FROM categories ORDER BY position ASC, rowid ASC');
+      const categories = [];
+      if (catRes.length > 0 && catRes[0].values) {
+        catRes[0].values.forEach(([id, name, color, icon, position]) => {
+          categories.push({ id, name, color, icon, position });
+        });
+      }
+
+      // 3. Habits
+      const habitRes = sqliteDb.exec('SELECT id, name, type, category_id, target, color, icon, created_at FROM habits WHERE archived = 0 ORDER BY rowid ASC');
+      const habits = [];
+      if (habitRes.length > 0 && habitRes[0].values) {
+        habitRes[0].values.forEach(([id, name, type, categoryId, target, color, icon, createdAt]) => {
+          habits.push({ id, name, type, categoryId, target, color, icon, createdAt });
+        });
+      }
+
+      // 4. Logs -> structure d'historique
+      const history = {};
+      const logsRes = sqliteDb.exec('SELECT habit_id, date, completed FROM logs WHERE completed = 1');
+      if (logsRes.length > 0 && logsRes[0].values) {
+        logsRes[0].values.forEach(([habitId, dateStr, completed]) => {
+          if (!completed) return;
+          const date = parseYMD(dateStr);
+          const monday = getMondayOfDate(date);
+          const weekKey = formatYMD(monday);
+          const dayIdx = (date.getDay() + 6) % 7;
+
+          if (!history[weekKey]) history[weekKey] = {};
+          if (!history[weekKey][habitId]) {
+            history[weekKey][habitId] = [false, false, false, false, false, false, false];
+          }
+          history[weekKey][habitId][dayIdx] = true;
+        });
+      }
+
+      appData = {
+        version: '3.0 SQLite',
+        updatedAt: new Date().toISOString(),
+        settings,
+        categories,
+        habits,
+        history
+      };
+
+      ensureWeekLogExists(selectedWeekKey);
+    }
+
     function ensureWeekLogExists(weekKey) {
       if (!appData.history[weekKey]) {
         appData.history[weekKey] = {};
@@ -747,30 +1107,28 @@
       });
     }
 
-    /*************************************************************************
-     * 3. MOTEUR DE PERSISTANCE JSON HYBRIDE (Disque Physique + Cache + Export)
-     *************************************************************************/
+    // Sauvegarde physique de la base SQLite
     async function persistData(reason = '') {
-      appData.updatedAt = new Date().toISOString();
-      const jsonString = JSON.stringify(appData, null, 2);
+      if (!sqliteDb) return;
+      const binaryData = sqliteDb.export();
 
-      // 1. Miroir de sécurité instantané
+      // 1. Sauvegarde instantanée dans IndexedDB
       try {
-        localStorage.setItem(CACHE_MIRROR_KEY, jsonString);
+        await idbSet('cached_sqlite_binary', binaryData);
       } catch (err) {
-        console.warn('Erreur écriture miroir :', err);
+        console.warn('Erreur miroir IndexedDB :', err);
       }
 
-      // 2. Écriture physique directe si un fichier .json est lié
+      // 2. Écriture physique sur le fichier du disque si lié
       if (fileHandle) {
         try {
           const writable = await fileHandle.createWritable();
-          await writable.write(jsonString);
+          await writable.write(binaryData);
           await writable.close();
           updateStorageBadge(true, fileHandle.name);
         } catch (err) {
-          console.error('Erreur écriture dans le fichier JSON lié :', err);
-          showToast('Impossible d’écrire sur le fichier JSON lié. Vérifiez les permissions.', 'error');
+          console.error('Erreur écriture dans le fichier SQLite lié :', err);
+          showToast('Impossible d’écrire dans le fichier .db lié. Vérifiez les permissions.', 'error');
           updateStorageBadge(false);
         }
       }
@@ -783,101 +1141,152 @@
       const btnText = document.getElementById('btnLinkText');
 
       if (isLinked) {
-        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20';
+        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 cursor-pointer hover:bg-emerald-500/20 transition';
         dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
-        text.textContent = `Synchronisé : ${fileName}`;
-        btnText.textContent = 'Changer de .json';
+        text.textContent = `SQLite lié : ${fileName}`;
+        btnText.textContent = 'Changer de .db';
       } else {
-        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20';
+        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 cursor-pointer hover:bg-amber-500/20 transition';
         dot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
-        text.textContent = 'Mémoire locale (Non lié)';
-        btnText.textContent = 'Lier un fichier .json';
+        text.textContent = 'Mémoire SQLite (Non lié)';
+        btnText.textContent = 'Lier habits.db';
       }
     }
 
-    // Ouvrir et lier un fichier JSON existant sur le disque
-    async function linkPhysicalJsonFile() {
+    async function handleBadgeClick() {
+      if (fileHandle) {
+        openSqlInspector();
+      } else {
+        const savedHandle = await idbGet('saved_sqlite_file_handle');
+        if (savedHandle) {
+          try {
+            const perm = await savedHandle.requestPermission({ mode: 'readwrite' });
+            if (perm === 'granted') {
+              fileHandle = savedHandle;
+              const file = await fileHandle.getFile();
+              const arrayBuffer = await file.arrayBuffer();
+              const uint8 = new Uint8Array(arrayBuffer);
+              const engine = await getSqlJsEngine();
+              sqliteDb = new engine.Database(uint8);
+              initSqliteSchema(sqliteDb);
+              syncStateFromSQLite();
+              applyThemeFromState();
+              renderAll();
+              updateStorageBadge(true, file.name);
+              showToast(`Base SQLite "${file.name}" reconnectée avec succès !`, 'success');
+              return;
+            }
+          } catch (e) {
+            console.warn('Reconnexion échouée', e);
+          }
+        }
+        linkPhysicalSqliteFile();
+      }
+    }
+
+    // Ouvrir et lier un fichier SQLite existant sur le disque
+    async function linkPhysicalSqliteFile() {
       if (!window.showOpenFilePicker) {
-        showToast('Votre navigateur ne supporte pas la liaison directe. Utilisez les boutons Exporter / Importer.', 'info');
+        showToast('Votre navigateur ne supporte pas l’accès direct au disque. Utilisez les boutons Exporter / Importer.', 'info');
         return;
       }
       try {
         const [handle] = await window.showOpenFilePicker({
           types: [{
-            description: 'Fichier de données HabitFlow JSON',
-            accept: { 'application/json': ['.json'] }
+            description: 'Base de données SQLite (*.db, *.sqlite)',
+            accept: {
+              'application/x-sqlite3': ['.db', '.sqlite'],
+              'application/vnd.sqlite3': ['.db', '.sqlite'],
+              'application/octet-stream': ['.db', '.sqlite']
+            }
           }],
           multiple: false
         });
+
         fileHandle = handle;
         const file = await fileHandle.getFile();
-        const content = await file.text();
+        const arrayBuffer = await file.arrayBuffer();
+        const uint8 = new Uint8Array(arrayBuffer);
 
-        if (content.trim().length > 0) {
-          const parsed = JSON.parse(content);
-          if (parsed && Array.isArray(parsed.habits) && parsed.history) {
-            appData = parsed;
-            applyThemeFromState();
-            renderAll();
-            showToast(`Fichier "${file.name}" chargé et lié en temps réel !`, 'success');
-          } else {
-            showToast('Format JSON non reconnu, synchronisation de vos données actuelles dans ce fichier.', 'info');
-            await persistData();
-          }
+        const engine = await getSqlJsEngine();
+        if (uint8.length > 0) {
+          sqliteDb = new engine.Database(uint8);
+          initSqliteSchema(sqliteDb);
         } else {
-          // Fichier vide : on écrit les données actuelles dedans
-          await persistData();
-          showToast(`Fichier "${file.name}" initialisé et lié !`, 'success');
+          sqliteDb = new engine.Database();
+          initSqliteSchema(sqliteDb);
+          importJsonIntoSQLite(getDefaultData());
+          await persistData('init-empty-file');
         }
+
+        await idbSet('saved_sqlite_file_handle', fileHandle);
+        syncStateFromSQLite();
+        applyThemeFromState();
+        renderAll();
         updateStorageBadge(true, file.name);
+        showToast(`Base SQLite "${file.name}" liée et active en temps réel !`, 'success');
       } catch (err) {
         if (err.name !== 'AbortError') {
-          showToast('Liaison annulée ou impossible.', 'error');
+          console.error(err);
+          showToast('Ouverture du fichier SQLite annulée ou impossible.', 'error');
         }
       }
     }
 
-    // Créer un nouveau fichier JSON physique sur le disque et le lier immédiatement
-    async function createNewPhysicalJsonFile() {
+    // Créer un nouveau fichier SQLite sur le disque et le lier immédiatement
+    async function createNewPhysicalSqliteFile() {
       if (!window.showSaveFilePicker) {
-        exportJsonDownload();
+        exportSqliteDownload();
         return;
       }
       try {
         const handle = await window.showSaveFilePicker({
-          suggestedName: 'habitflow-data.json',
+          suggestedName: 'habits.db',
           types: [{
-            description: 'Fichier JSON HabitFlow',
-            accept: { 'application/json': ['.json'] }
+            description: 'Fichier SQLite HabitFlow',
+            accept: {
+              'application/x-sqlite3': ['.db', '.sqlite']
+            }
           }]
         });
+
         fileHandle = handle;
-        await persistData();
+        const engine = await getSqlJsEngine();
+        if (!sqliteDb) {
+          sqliteDb = new engine.Database();
+          initSqliteSchema(sqliteDb);
+          importJsonIntoSQLite(getDefaultData());
+        }
+
+        await idbSet('saved_sqlite_file_handle', fileHandle);
+        await persistData('create-new-file');
+        syncStateFromSQLite();
         updateStorageBadge(true, handle.name);
-        showToast(`Fichier "${handle.name}" créé sur votre disque et lié en temps réel !`, 'success');
+        showToast(`Fichier "${handle.name}" créé sur votre disque et synchronisé !`, 'success');
       } catch (err) {
         if (err.name !== 'AbortError') {
-          showToast('Création du fichier annulée.', 'info');
+          showToast('Création de la base SQLite annulée.', 'info');
         }
       }
     }
 
-    // Export classique par téléchargement
-    function exportJsonDownload() {
-      const jsonString = JSON.stringify(appData, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
+    // Télécharger une copie directe du fichier .db
+    function exportSqliteDownload() {
+      if (!sqliteDb) return;
+      const binary = sqliteDb.export();
+      const blob = new Blob([binary], { type: 'application/x-sqlite3' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `habitflow-data-${formatYMD(new Date())}.json`;
+      a.download = `habits-${formatYMD(new Date())}.db`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast('Fichier JSON exporté avec succès !', 'success');
+      showToast('Fichier habits.db téléchargé avec succès !', 'success');
     }
 
-    // Import classique depuis un input file
+    // Importer ou migrer un fichier JSON classique (habitflow-data.json) dans SQLite
     function importJsonFile(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -885,16 +1294,23 @@
       reader.onload = async (e) => {
         try {
           const parsed = JSON.parse(e.target.result);
-          if (!parsed || !Array.isArray(parsed.habits) || !parsed.history) {
-            throw new Error('Schéma invalide');
+          if (!parsed || !Array.isArray(parsed.habits)) {
+            throw new Error('Format JSON invalide');
           }
-          appData = parsed;
+          const engine = await getSqlJsEngine();
+          if (!sqliteDb) {
+            sqliteDb = new engine.Database();
+            initSqliteSchema(sqliteDb);
+          }
+          importJsonIntoSQLite(parsed);
+          await persistData('import-json');
+          syncStateFromSQLite();
           applyThemeFromState();
-          await persistData();
           renderAll();
-          showToast(`Données importées depuis "${file.name}" !`, 'success');
+          showToast(`Données migrées avec succès dans SQLite (${parsed.habits.length} habitudes) !`, 'success');
         } catch (err) {
-          showToast('Fichier JSON invalide.', 'error');
+          console.error(err);
+          showToast('Erreur lors de la migration du fichier JSON.', 'error');
         }
       };
       reader.readAsText(file);
@@ -905,23 +1321,19 @@
      * 4. NAVIGATION TEMPORELLE (SEMAINES ANTÉRIEURES / SUIVANTES)
      *************************************************************************/
     function changeWeek(deltaWeeks) {
-      const currentMonday = parseYMD(selectedWeekKey);
-      const nextMonday = addDays(currentMonday, deltaWeeks * 7);
-      selectedWeekKey = formatYMD(nextMonday);
-      ensureWeekLogExists(selectedWeekKey);
+      const curMonday = parseYMD(selectedWeekKey);
+      const targetMonday = addDays(curMonday, deltaWeeks * 7);
+      selectedWeekKey = formatYMD(targetMonday);
       renderAll();
     }
 
     function jumpToCurrentWeek() {
       selectedWeekKey = currentWeekMondayKey;
-      ensureWeekLogExists(selectedWeekKey);
       renderAll();
     }
 
     function jumpToWeekKey(weekKey) {
-      if (!weekKey) return;
       selectedWeekKey = weekKey;
-      ensureWeekLogExists(selectedWeekKey);
       renderAll();
     }
 
@@ -931,50 +1343,47 @@
       const weekNum = getISOWeekNumber(mondayDate);
 
       document.getElementById('weekNumberLabel').textContent = `Semaine ${weekNum} • ${mondayDate.getFullYear()}`;
-      document.getElementById('weekDateRangeLabel').textContent =
-        `${mondayDate.getDate()} ${MONTH_NAMES[mondayDate.getMonth()]} – ${sundayDate.getDate()} ${MONTH_NAMES[sundayDate.getMonth()]} ${sundayDate.getFullYear()}`;
+      document.getElementById('weekRangeLabel').textContent =
+        `${mondayDate.getDate()} ${MONTH_NAMES[mondayDate.getMonth()]} au ${sundayDate.getDate()} ${MONTH_NAMES[sundayDate.getMonth()]}`;
 
-      const badge = document.getElementById('weekContextBadge');
-      const btnJump = document.getElementById('btnJumpCurrentWeek');
+      const isCurrent = selectedWeekKey === currentWeekMondayKey;
+      document.getElementById('weekCurrentBadge').classList.toggle('hidden', !isCurrent);
 
-      if (selectedWeekKey === currentWeekMondayKey) {
-        badge.textContent = 'Cette semaine';
-        badge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500';
-        btnJump.classList.add('hidden');
-      } else if (selectedWeekKey < currentWeekMondayKey) {
-        badge.textContent = 'Archive passée';
-        badge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500';
-        btnJump.classList.remove('hidden');
-      } else {
-        badge.textContent = 'Semaine future';
-        badge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-500';
-        btnJump.classList.remove('hidden');
+      // Boutons d'accès rapide aux 4 dernières semaines
+      const recentContainer = document.getElementById('recentWeeksContainer');
+      const weeksToShow = [];
+      for (let i = 0; i < 4; i++) {
+        const m = addDays(getMondayOfDate(todayDate), -i * 7);
+        weeksToShow.push(formatYMD(m));
       }
 
-      // Peupler la liste déroulante des semaines existantes dans le JSON
-      const allWeeks = new Set([...Object.keys(appData.history), currentWeekMondayKey, selectedWeekKey]);
-      const sortedWeeks = Array.from(allWeeks).sort().reverse();
-      const select = document.getElementById('archiveWeekSelect');
-      select.innerHTML = sortedWeeks.map(wKey => {
+      recentContainer.innerHTML = weeksToShow.map((wKey, idx) => {
+        const isSel = wKey === selectedWeekKey;
         const mDate = parseYMD(wKey);
-        const sDate = addDays(mDate, 6);
-        const wNo = getISOWeekNumber(mDate);
-        const tag = wKey === currentWeekMondayKey ? ' (Actuelle)' : '';
-        return `<option value="${wKey}" ${wKey === selectedWeekKey ? 'selected' : ''}>
-          S${wNo} : ${mDate.getDate()} ${MONTH_NAMES[mDate.getMonth()]} - ${sDate.getDate()} ${MONTH_NAMES[sDate.getMonth()]}${tag}
-        </option>`;
+        const wNum = getISOWeekNumber(mDate);
+        const label = idx === 0 ? 'Courante' : `S-${idx} (S${wNum})`;
+        return `
+          <button
+            onclick="jumpToWeekKey('${wKey}')"
+            class="px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+              isSel
+                ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+            }"
+          >
+            ${label}
+          </button>
+        `;
       }).join('');
     }
 
     /*************************************************************************
      * 5. CALCUL DES SÉRIES MULTI-SEMAINES (STREAKS) & KPIs
      *************************************************************************/
-    // Calcule la série active d'une habitude à travers toutes les semaines passées jusqu'à aujourd'hui
     function calculateMultiWeekStreak(habitId) {
       let streak = 0;
       let cursorDate = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
 
-      // Si aujourd'hui n'est pas encore coché, on vérifie à partir d'hier pour ne pas briser la série en cours de journée
       const todayMondayKey = formatYMD(getMondayOfDate(cursorDate));
       const todayDayIdx = (cursorDate.getDay() + 6) % 7;
       const isCheckedToday = appData.history[todayMondayKey]?.[habitId]?.[todayDayIdx] === true;
@@ -1002,7 +1411,7 @@
       const weekLogs = appData.history[selectedWeekKey];
       const habits = appData.habits;
 
-      // 1. Taux de réussite de la semaine sélectionnée
+      // 1. Taux de réussite de la semaine
       let totalChecks = 0;
       let totalTargets = 0;
       let goalsMetCount = 0;
@@ -1031,14 +1440,14 @@
         weekBadge.className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500';
       }
 
-      // 2. Aujourd'hui (ou moyenne si archive)
+      // 2. Validés aujourd'hui
       const todayIdx = (todayDate.getDay() + 6) % 7;
       let todayDone = 0;
       habits.forEach(h => {
         if (weekLogs[h.id]?.[todayIdx]) todayDone++;
       });
       document.getElementById('kpiTodayTitle').textContent =
-        selectedWeekKey === currentWeekMondayKey ? `Aujourd'hui (${DAY_LABELS[todayIdx]})` : `Ce ${DAY_LABELS[todayIdx]} (Semaine sélectionnée)`;
+        selectedWeekKey === currentWeekMondayKey ? `Aujourd'hui (${DAY_LABELS[todayIdx]})` : `Ce ${DAY_LABELS[todayIdx]} (Archive)`;
       document.getElementById('kpiTodayCount').textContent = `${todayDone} / ${habits.length}`;
       document.getElementById('kpiTodaySub').textContent =
         habits.length > 0 && todayDone === habits.length
@@ -1058,7 +1467,7 @@
       document.getElementById('kpiBestStreak').textContent = `${bestStreak} j`;
       document.getElementById('kpiBestStreakHabit').textContent = bestHabitName;
 
-      // 4. Cibles atteintes & meilleure catégorie
+      // 4. Objectifs atteints & catégorie forte
       document.getElementById('kpiGoalsMet').textContent = `${goalsMetCount} / ${habits.length}`;
 
       let topCatName = '--';
@@ -1077,11 +1486,11 @@
     }
 
     /*************************************************************************
-     * 6. RENDU DES CATÉGORIES ET DE LA GRILLE D'HABITUDES
+     * 6. GESTION DES CATÉGORIES & GRILLE D'HABITUDES
      *************************************************************************/
     function getCategoryById(catId) {
       return appData.categories.find(c => c.id === catId) || {
-        id: 'default',
+        id: 'unknown',
         name: 'Général',
         color: '#64748b',
         icon: 'fa-tag'
@@ -1089,32 +1498,43 @@
     }
 
     function renderCategoryFilters() {
-      const container = document.getElementById('categoryFilterBar');
-      const allBtn = `
-        <button onclick="setCategoryFilter('all')" class="shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-          activeCategoryFilter === 'all'
-            ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
-            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-        }">
-          Toutes (${appData.habits.length})
+      const container = document.getElementById('categoryPillsContainer');
+      const allCount = appData.habits.length;
+
+      let pillsHtml = `
+        <button
+          onclick="setCategoryFilter('all')"
+          class="px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+            activeCategoryFilter === 'all'
+              ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
+              : 'bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800'
+          }"
+        >
+          Toutes <span class="text-[10px] opacity-70 ml-1">(${allCount})</span>
         </button>
       `;
 
-      const catBtns = appData.categories.map(cat => {
+      appData.categories.forEach(cat => {
         const count = appData.habits.filter(h => h.categoryId === cat.id).length;
-        const isActive = activeCategoryFilter === cat.id;
-        return `
-          <button onclick="setCategoryFilter('${cat.id}')" class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition"
-            style="${isActive ? `background-color: ${cat.color}; color: #fff;` : ''}"
-            class="${!isActive ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700' : ''}">
-            <i class="fa-solid ${cat.icon} text-[11px]" style="${!isActive ? `color: ${cat.color}` : ''}"></i>
+        const isSel = activeCategoryFilter === cat.id;
+        pillsHtml += `
+          <button
+            onclick="setCategoryFilter('${cat.id}')"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+              isSel
+                ? 'text-white shadow-sm'
+                : 'bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800'
+            }"
+            style="${isSel ? `background-color: ${cat.color}; border-color: ${cat.color};` : ''}"
+          >
+            <i class="fa-solid ${cat.icon} text-[10px]"></i>
             <span>${escapeHtml(cat.name)}</span>
-            <span class="opacity-75 text-[10px]">(${count})</span>
+            <span class="text-[10px] opacity-70">(${count})</span>
           </button>
         `;
-      }).join('');
+      });
 
-      container.innerHTML = allBtn + catBtns;
+      container.innerHTML = pillsHtml;
     }
 
     function setCategoryFilter(catId) {
@@ -1128,7 +1548,6 @@
       const mondayDate = parseYMD(selectedWeekKey);
       const todayYMD = formatYMD(todayDate);
 
-      // En-tête avec les vraies dates de la semaine sélectionnée
       const headerRow = document.getElementById('tableHeaderRow');
       let daysColsHtml = '';
       for (let i = 0; i < 7; i++) {
@@ -1153,7 +1572,6 @@
         <th class="py-3.5 pr-5 pl-2 text-right min-w-[80px]">Actions</th>
       `;
 
-      // Filtrage des habitudes
       const searchQuery = (document.getElementById('searchHabitInput')?.value || '').trim().toLowerCase();
       const filteredHabits = appData.habits.filter(h => {
         const matchesCat = activeCategoryFilter === 'all' || h.categoryId === activeCategoryFilter;
@@ -1195,7 +1613,7 @@
                 style="${isChecked ? `background-color: ${habit.color};` : ''}"
                 title="${DAY_LABELS[dayIdx]} ${colDate.getDate()} : ${isChecked ? 'Validé' : 'Non validé'}"
               >
-                <i class="fa-solid ${isAbstinence ? 'fa-shield-check fa-check' : 'fa-check'} text-xs"></i>
+                <i class="fa-solid ${isAbstinence ? 'fa-shield-halved text-[11px]' : 'fa-check text-xs'}"></i>
               </button>
             </td>
           `;
@@ -1213,7 +1631,7 @@
                   <div class="flex items-center gap-1.5 flex-wrap">
                     <span class="font-semibold text-slate-800 dark:text-slate-100 truncate">${escapeHtml(habit.name)}</span>
                     ${isAbstinence ? `
-                      <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" title="Objectif d'abstinence">
+                      <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                         🛡️ Abstinence
                       </span>
                     ` : ''}
@@ -1270,209 +1688,253 @@
       }).join('');
     }
 
-    // Cocher / Décocher un jour et sauvegarder dans le fichier JSON
+    // Cocher / Décocher un jour avec écriture SQL immédiate
     async function toggleHabitCheck(habitId, dayIndex) {
-      ensureWeekLogExists(selectedWeekKey);
-      const currentVal = appData.history[selectedWeekKey][habitId][dayIndex];
-      appData.history[selectedWeekKey][habitId][dayIndex] = !currentVal;
+      if (!sqliteDb) return;
+      const mondayDate = parseYMD(selectedWeekKey);
+      const targetDate = formatYMD(addDays(mondayDate, dayIndex));
+
+      const existingRes = sqliteDb.exec("SELECT completed FROM logs WHERE habit_id = ? AND date = ?", [habitId, targetDate]);
+      const isDone = existingRes.length > 0 && existingRes[0].values.length > 0 && existingRes[0].values[0][0] === 1;
+
+      if (isDone) {
+        sqliteDb.run("DELETE FROM logs WHERE habit_id = ? AND date = ?", [habitId, targetDate]);
+      } else {
+        sqliteDb.run("INSERT OR REPLACE INTO logs (habit_id, date, completed) VALUES (?, ?, 1)", [habitId, targetDate]);
+      }
+
       await persistData('toggle-check');
+      syncStateFromSQLite();
       renderAll();
     }
 
     async function clearCurrentWeekChecks() {
-      if (!confirm('Voulez-vous vraiment décocher toutes les cases de la semaine affichée ? (Les autres semaines ne seront pas touchées)')) return;
-      appData.history[selectedWeekKey] = {};
-      ensureWeekLogExists(selectedWeekKey);
+      if (!confirm('Voulez-vous vraiment décocher toutes les cases de la semaine affichée ?')) return;
+      if (!sqliteDb) return;
+
+      const monday = parseYMD(selectedWeekKey);
+      const dates = [];
+      for (let i = 0; i < 7; i++) {
+        dates.push(formatYMD(addDays(monday, i)));
+      }
+      const placeholders = dates.map(() => '?').join(',');
+      sqliteDb.run(`DELETE FROM logs WHERE date IN (${placeholders})`, dates);
+
       await persistData('clear-week');
+      syncStateFromSQLite();
       renderAll();
-      showToast('Semaine réinitialisée.', 'info');
+      showToast('Semaine réinitialisée dans SQLite.', 'info');
     }
 
     /*************************************************************************
-     * 7. GRAPHIQUES TEMPS RÉEL & COMPARATIF MULTI-SEMAINES
+     * 7. GRAPHIQUES AVANCÉS (CHART.JS)
      *************************************************************************/
     function setChartMode(mode) {
       chartMode = mode;
-      const btnPct = document.getElementById('btnChartModePct');
-      const btnCnt = document.getElementById('btnChartModeCount');
-      if (mode === 'percent') {
-        btnPct.className = 'px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 shadow-sm text-emerald-600 dark:text-emerald-400';
-        btnCnt.className = 'px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400';
-      } else {
-        btnCnt.className = 'px-2.5 py-1 rounded-lg text-xs font-semibold bg-white dark:bg-slate-900 shadow-sm text-emerald-600 dark:text-emerald-400';
-        btnPct.className = 'px-2.5 py-1 rounded-lg text-xs font-medium text-slate-500 dark:text-slate-400';
-      }
+      document.getElementById('btnChartModePercent').className =
+        mode === 'percent'
+          ? 'px-2.5 py-1 rounded-lg font-semibold bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm transition'
+          : 'px-2.5 py-1 rounded-lg font-medium text-slate-500 dark:text-slate-400 transition';
+      document.getElementById('btnChartModeCount').className =
+        mode === 'count'
+          ? 'px-2.5 py-1 rounded-lg font-semibold bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm transition'
+          : 'px-2.5 py-1 rounded-lg font-medium text-slate-500 dark:text-slate-400 transition';
       renderCharts();
     }
 
     function renderCharts() {
       ensureWeekLogExists(selectedWeekKey);
       const weekLogs = appData.history[selectedWeekKey];
-      const totalHabits = appData.habits.length;
-      const mondayDate = parseYMD(selectedWeekKey);
+      const habits = appData.habits;
       const isDark = document.documentElement.classList.contains('dark');
+      const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.15)';
       const textColor = isDark ? '#94a3b8' : '#64748b';
-      const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)';
 
-      // Données quotidiennes sur les 7 jours de la semaine sélectionnée
-      const labels = DAY_LABELS.map((d, idx) => {
-        const dt = addDays(mondayDate, idx);
-        return `${d} ${dt.getDate()}`;
-      });
-
+      // 1. Graphique d'évolution journalière
       const dailyCounts = [0, 0, 0, 0, 0, 0, 0];
-      appData.habits.forEach(h => {
-        const arr = weekLogs[h.id] || [];
-        for (let i = 0; i < 7; i++) {
-          if (arr[i]) dailyCounts[i]++;
-        }
+      habits.forEach(h => {
+        (weekLogs[h.id] || []).forEach((c, idx) => {
+          if (c) dailyCounts[idx]++;
+        });
       });
 
-      const dailyData = chartMode === 'percent'
-        ? dailyCounts.map(c => (totalHabits > 0 ? Math.round((c / totalHabits) * 100) : 0))
+      const totalHabits = Math.max(1, habits.length);
+      const chartValues = chartMode === 'percent'
+        ? dailyCounts.map(count => Math.round((count / totalHabits) * 100))
         : dailyCounts;
 
-      // Graphique 1 : Barres + Ligne
-      const ctxWeekly = document.getElementById('weeklyChartCanvas').getContext('2d');
-      if (weeklyChartInstance) weeklyChartInstance.destroy();
+      const mondayDate = parseYMD(selectedWeekKey);
+      const dayLabelsWithDates = DAY_LABELS.map((d, i) => `${d} ${addDays(mondayDate, i).getDate()}`);
 
-      weeklyChartInstance = new Chart(ctxWeekly, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            {
-              type: 'line',
-              label: 'Tendance',
-              data: dailyData,
-              borderColor: '#14b8a6',
-              backgroundColor: 'rgba(20, 184, 166, 0.15)',
+      const ctxWeekly = document.getElementById('weeklyChart')?.getContext('2d');
+      if (ctxWeekly) {
+        if (weeklyChartInstance) weeklyChartInstance.destroy();
+
+        const gradient = ctxWeekly.createLinearGradient(0, 0, 0, 240);
+        gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+        gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+        weeklyChartInstance = new Chart(ctxWeekly, {
+          type: 'line',
+          data: {
+            labels: dayLabelsWithDates,
+            datasets: [{
+              label: chartMode === 'percent' ? '% Réussite' : 'Habitudes validées',
+              data: chartValues,
+              borderColor: '#10b981',
+              backgroundColor: gradient,
               borderWidth: 2.5,
+              fill: true,
               tension: 0.35,
+              pointBackgroundColor: '#10b981',
+              pointBorderColor: isDark ? '#020617' : '#ffffff',
+              pointBorderWidth: 2,
               pointRadius: 4,
-              pointBackgroundColor: '#10b981'
-            },
-            {
-              type: 'bar',
-              label: chartMode === 'percent' ? 'Réussite (%)' : 'Habitudes validées',
-              data: dailyData,
-              backgroundColor: 'rgba(16, 185, 129, 0.75)',
-              hoverBackgroundColor: '#10b981',
-              borderRadius: 8,
-              maxBarThickness: 38
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => chartMode === 'percent' ? ` ${ctx.parsed.y}% accomplis` : ` ${ctx.parsed.y} habitude(s)`
-              }
-            }
+              pointHoverRadius: 6
+            }]
           },
-          scales: {
-            x: {
-              grid: { display: false },
-              ticks: { color: textColor, font: { size: 11 } }
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: isDark ? '#0f172a' : '#ffffff',
+                titleColor: isDark ? '#f8fafc' : '#0f172a',
+                bodyColor: isDark ? '#cbd5e1' : '#334155',
+                borderColor: isDark ? '#1e293b' : '#e2e8f0',
+                borderWidth: 1,
+                padding: 10,
+                callbacks: {
+                  label: ctx => ` ${ctx.parsed.y}${chartMode === 'percent' ? '%' : ' validée(s)'}`
+                }
+              }
             },
-            y: {
-              beginAtZero: true,
-              max: chartMode === 'percent' ? 100 : Math.max(5, totalHabits),
-              grid: { color: gridColor },
-              ticks: {
-                color: textColor,
-                font: { size: 11 },
-                callback: (val) => chartMode === 'percent' ? `${val}%` : val
+            scales: {
+              x: {
+                grid: { color: gridColor },
+                ticks: { color: textColor, font: { size: 11, family: 'Inter' } }
+              },
+              y: {
+                min: 0,
+                max: chartMode === 'percent' ? 100 : totalHabits,
+                grid: { color: gridColor },
+                ticks: {
+                  color: textColor,
+                  font: { size: 10, family: 'Inter' },
+                  callback: val => chartMode === 'percent' ? `${val}%` : val
+                }
               }
             }
           }
-        }
-      });
+        });
+      }
 
-      // Graphique 2 : Répartition par Catégorie
+      // 2. Graphique par catégorie (Doughnut)
       const catLabels = [];
-      const catValues = [];
+      const catCounts = [];
       const catColors = [];
 
       appData.categories.forEach(cat => {
-        const catHabits = appData.habits.filter(h => h.categoryId === cat.id);
-        const checksSum = catHabits.reduce((acc, h) => acc + (weekLogs[h.id] || []).filter(Boolean).length, 0);
-        if (checksSum > 0) {
+        const catHabits = habits.filter(h => h.categoryId === cat.id);
+        const sum = catHabits.reduce((acc, h) => acc + (weekLogs[h.id] || []).filter(Boolean).length, 0);
+        if (sum > 0 || catHabits.length > 0) {
           catLabels.push(cat.name);
-          catValues.push(checksSum);
+          catCounts.push(sum);
           catColors.push(cat.color);
         }
       });
 
-      const ctxCat = document.getElementById('categoryChartCanvas').getContext('2d');
-      if (categoryChartInstance) categoryChartInstance.destroy();
+      const ctxCategory = document.getElementById('categoryChart')?.getContext('2d');
+      if (ctxCategory) {
+        if (categoryChartInstance) categoryChartInstance.destroy();
 
-      categoryChartInstance = new Chart(ctxCat, {
-        type: 'doughnut',
-        data: {
-          labels: catLabels.length > 0 ? catLabels : ['Aucune coche'],
-          datasets: [{
-            data: catValues.length > 0 ? catValues : [1],
-            backgroundColor: catValues.length > 0 ? catColors : [isDark ? '#1e293b' : '#e2e8f0'],
-            borderWidth: 0
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '68%',
-          plugins: {
-            legend: {
-              position: 'right',
-              labels: { color: textColor, boxWidth: 10, font: { size: 11 } }
+        categoryChartInstance = new Chart(ctxCategory, {
+          type: 'doughnut',
+          data: {
+            labels: catLabels,
+            datasets: [{
+              data: catCounts.length > 0 ? catCounts : [1],
+              backgroundColor: catCounts.length > 0 ? catColors : ['#475569'],
+              borderWidth: 2,
+              borderColor: isDark ? '#0f172a' : '#ffffff'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: {
+                  color: textColor,
+                  boxWidth: 10,
+                  font: { size: 10, family: 'Inter' }
+                }
+              }
             }
           }
-        }
-      });
+        });
+      }
 
-      // Comparatif des 4 dernières semaines (Archives rapides)
       renderMultiWeekComparison();
     }
 
+    /*************************************************************************
+     * 8. COMPARATEUR HISTORIQUE MULTI-SEMAINES (SQLITE LOGS)
+     *************************************************************************/
     function renderMultiWeekComparison() {
-      const container = document.getElementById('multiWeekHistoryList');
-      const totalTargetPerWeek = appData.habits.reduce((acc, h) => acc + Number(h.target || 7), 0);
+      const container = document.getElementById('multiWeekComparisonGrid');
+      const weeks = [];
+      for (let i = 0; i < 8; i++) {
+        const m = addDays(getMondayOfDate(todayDate), -i * 7);
+        weeks.push(formatYMD(m));
+      }
 
-      // On affiche les 4 dernières semaines à partir de la semaine actuelle
-      const weeksToShow = [0, -1, -2, -3].map(offset => formatYMD(addDays(parseYMD(currentWeekMondayKey), offset * 7)));
+      const habits = appData.habits;
 
-      container.innerHTML = weeksToShow.map(wKey => {
+      container.innerHTML = weeks.map(wKey => {
         const mDate = parseYMD(wKey);
         const wNum = getISOWeekNumber(mDate);
-        const logs = appData.history[wKey] || {};
-        let checks = 0;
-        appData.habits.forEach(h => {
-          checks += (logs[h.id] || []).filter(Boolean).length;
-        });
-        const pct = totalTargetPerWeek > 0 ? Math.min(100, Math.round((checks / totalTargetPerWeek) * 100)) : 0;
         const isSelected = wKey === selectedWeekKey;
+        const isCurrent = wKey === currentWeekMondayKey;
+
+        const wLogs = appData.history[wKey] || {};
+        let checks = 0;
+        let targets = 0;
+        habits.forEach(h => {
+          checks += (wLogs[h.id] || []).filter(Boolean).length;
+          targets += Number(h.target || 7);
+        });
+
+        const pct = targets > 0 ? Math.min(100, Math.round((checks / targets) * 100)) : 0;
 
         return `
-          <button onclick="jumpToWeekKey('${wKey}')" class="w-full flex items-center justify-between p-2 rounded-xl text-left transition ${
-            isSelected
-              ? 'bg-emerald-500/10 border border-emerald-500/30'
-              : 'hover:bg-slate-100 dark:hover:bg-slate-800/60 border border-transparent'
-          }">
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="text-xs font-bold ${isSelected ? 'text-emerald-500' : 'text-slate-500'}">S${wNum}</span>
-              <span class="text-xs text-slate-600 dark:text-slate-300 truncate">
-                Lun ${mDate.getDate()} ${MONTH_NAMES[mDate.getMonth()]}
-              </span>
+          <button
+            onclick="jumpToWeekKey('${wKey}')"
+            class="text-left p-3 rounded-xl border transition flex flex-col justify-between ${
+              isSelected
+                ? 'border-emerald-500 bg-emerald-500/10 shadow-sm'
+                : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-700'
+            }"
+          >
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold text-slate-700 dark:text-slate-300">S${wNum}</span>
+                ${isCurrent ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>' : ''}
+              </div>
+              <div class="text-[10px] text-slate-400 mt-0.5">${mDate.getDate()} ${MONTH_NAMES[mDate.getMonth()]}</div>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <div class="w-20 h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+
+            <div class="mt-3">
+              <div class="flex items-center justify-between text-[11px] font-extrabold mb-1">
+                <span class="${pct >= 80 ? 'text-emerald-500' : pct >= 50 ? 'text-blue-500' : 'text-slate-400'}">${pct}%</span>
+                <span class="text-[10px] text-slate-400 font-normal">${checks}/${targets}</span>
+              </div>
+              <div class="w-full h-1 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                 <div class="h-full bg-emerald-500 rounded-full" style="width: ${pct}%"></div>
               </div>
-              <span class="text-xs font-bold w-9 text-right">${pct}%</span>
             </div>
           </button>
         `;
@@ -1480,7 +1942,7 @@
     }
 
     /*************************************************************************
-     * 8. GESTION DES CATÉGORIES PERSONNALISÉES (CRÉATION & SUPPRESSION)
+     * 9. GESTION DES CATÉGORIES & MODALES CRUD (AVEC ÉCRITURES SQL)
      *************************************************************************/
     function openCategoryModal() {
       renderCategoryManagerList();
@@ -1522,6 +1984,8 @@
 
     async function addCategoryFromModal(e) {
       e.preventDefault();
+      if (!sqliteDb) return;
+
       const nameInput = document.getElementById('newCatNameInput');
       const colorInput = document.getElementById('newCatColorInput');
       const iconSelect = document.getElementById('newCatIconSelect');
@@ -1529,19 +1993,18 @@
       const name = nameInput.value.trim();
       if (!name) return;
 
-      const newCat = {
-        id: 'cat_' + Date.now(),
-        name,
-        color: colorInput.value,
-        icon: iconSelect.value
-      };
+      const newId = 'cat_' + Date.now();
+      sqliteDb.run(
+        "INSERT INTO categories (id, name, color, icon, position) VALUES (?, ?, ?, ?, 0)",
+        [newId, name, colorInput.value, iconSelect.value]
+      );
 
-      appData.categories.push(newCat);
       nameInput.value = '';
       await persistData('add-category');
+      syncStateFromSQLite();
       renderCategoryManagerList();
       renderAll();
-      showToast(`Catégorie "${name}" créée !`, 'success');
+      showToast(`Catégorie "${name}" créée dans SQLite !`, 'success');
     }
 
     async function deleteCategory(catId) {
@@ -1550,49 +2013,44 @@
         return;
       }
       const fallbackCat = appData.categories.find(c => c.id !== catId);
-      appData.habits.forEach(h => {
-        if (h.categoryId === catId) h.categoryId = fallbackCat.id;
-      });
-      appData.categories = appData.categories.filter(c => c.id !== catId);
+      sqliteDb.run("UPDATE habits SET category_id = ? WHERE category_id = ?", [fallbackCat.id, catId]);
+      sqliteDb.run("DELETE FROM categories WHERE id = ?", [catId]);
       if (activeCategoryFilter === catId) activeCategoryFilter = 'all';
 
       await persistData('delete-category');
+      syncStateFromSQLite();
       renderCategoryManagerList();
       renderAll();
       showToast('Catégorie supprimée.', 'info');
     }
 
-    // Création rapide de catégorie depuis la modale d'habitude
     function toggleQuickCategoryForm() {
       const box = document.getElementById('quickCategoryBox');
       box.classList.toggle('hidden');
     }
 
     async function saveQuickCategory() {
+      if (!sqliteDb) return;
       const nameEl = document.getElementById('quickCatName');
       const colorEl = document.getElementById('quickCatColor');
       const name = nameEl.value.trim();
       if (!name) return;
 
-      const newCat = {
-        id: 'cat_' + Date.now(),
-        name,
-        color: colorEl.value,
-        icon: 'fa-star'
-      };
-      appData.categories.push(newCat);
-      await persistData('quick-category');
+      const newId = 'cat_' + Date.now();
+      sqliteDb.run(
+        "INSERT INTO categories (id, name, color, icon, position) VALUES (?, ?, ?, ?, 0)",
+        [newId, name, colorEl.value, 'fa-star']
+      );
 
-      populateHabitCategorySelect(newCat.id);
+      await persistData('quick-category');
+      syncStateFromSQLite();
+      populateHabitCategorySelect(newId);
       nameEl.value = '';
       document.getElementById('quickCategoryBox').classList.add('hidden');
       renderAll();
       showToast(`Catégorie "${name}" ajoutée !`, 'success');
     }
 
-    /*************************************************************************
-     * 9. CRÉATION / MODIFICATION / SUPPRESSION D'HABITUDE
-     *************************************************************************/
     function selectHabitType(type) {
       currentHabitType = type;
       const btnAbs = document.getElementById('typeBtnAbstinence');
@@ -1602,7 +2060,7 @@
         btnAbs.className = 'flex items-center gap-2.5 p-3 rounded-xl border-2 border-emerald-500 bg-emerald-500/5 text-left transition';
         btnAct.className = 'flex items-center gap-2.5 p-3 rounded-xl border-2 border-slate-200 dark:border-slate-800 text-left opacity-70 transition';
         document.getElementById('habitTargetInput').value = 7;
-        document.getElementById('habitTargetLabel').textContent = '7 jours / 7';
+        document.getElementById('habitTargetLabel').textContent = '7 jour(s) / 7';
         document.getElementById('habitIconSelect').value = 'fa-shield-halved';
       } else {
         btnAct.className = 'flex items-center gap-2.5 p-3 rounded-xl border-2 border-blue-500 bg-blue-500/5 text-left transition';
@@ -1654,6 +2112,8 @@
 
     async function saveHabitFromModal(e) {
       e.preventDefault();
+      if (!sqliteDb) return;
+
       const id = document.getElementById('habitIdInput').value;
       const name = document.getElementById('habitNameInput').value.trim();
       const categoryId = document.getElementById('habitCategorySelect').value;
@@ -1664,36 +2124,22 @@
       if (!name) return;
 
       if (id) {
-        const idx = appData.habits.findIndex(h => h.id === id);
-        if (idx !== -1) {
-          appData.habits[idx] = {
-            ...appData.habits[idx],
-            name,
-            type: currentHabitType,
-            categoryId,
-            target,
-            color,
-            icon
-          };
-        }
-        showToast('Habitude mise à jour !', 'success');
+        sqliteDb.run(
+          "UPDATE habits SET name = ?, type = ?, category_id = ?, target = ?, color = ?, icon = ? WHERE id = ?",
+          [name, currentHabitType, categoryId, target, color, icon, id]
+        );
+        showToast('Habitude mise à jour dans SQLite !', 'success');
       } else {
-        const newHabit = {
-          id: 'hab_' + Date.now(),
-          name,
-          type: currentHabitType,
-          categoryId,
-          target,
-          color,
-          icon,
-          createdAt: selectedWeekKey
-        };
-        appData.habits.push(newHabit);
-        ensureWeekLogExists(selectedWeekKey);
-        showToast('Nouvelle habitude ajoutée !', 'success');
+        const newId = 'hab_' + Date.now();
+        sqliteDb.run(
+          "INSERT INTO habits (id, name, type, category_id, target, color, icon, created_at, archived) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)",
+          [newId, name, currentHabitType, categoryId, target, color, icon, selectedWeekKey]
+        );
+        showToast('Nouvelle habitude enregistrée dans SQLite !', 'success');
       }
 
       await persistData('save-habit');
+      syncStateFromSQLite();
       closeHabitModal();
       renderAll();
     }
@@ -1701,39 +2147,235 @@
     async function deleteHabit(habitId) {
       const h = appData.habits.find(item => item.id === habitId);
       if (!h) return;
-      if (!confirm(`Supprimer l'habitude "${h.name}" ainsi que son historique ?`)) return;
+      if (!confirm(`Supprimer l'habitude "${h.name}" ainsi que son historique SQLite ?`)) return;
 
-      appData.habits = appData.habits.filter(item => item.id !== habitId);
-      Object.keys(appData.history).forEach(wKey => {
-        delete appData.history[wKey][habitId];
-      });
-
+      sqliteDb.run("DELETE FROM habits WHERE id = ?", [habitId]);
       await persistData('delete-habit');
+      syncStateFromSQLite();
       renderAll();
-      showToast('Habitude supprimée.', 'info');
+      showToast('Habitude supprimée de SQLite.', 'info');
     }
 
     /*************************************************************************
-     * 10. INSPECTEUR JSON, THÈME & NOTIFICATIONS
+     * 10. CONSOLE & EXPLORATEUR SQLITE (TABLES, QUERIES, DUMP)
      *************************************************************************/
-    function openJsonInspector() {
-      document.getElementById('jsonInspectorPre').textContent = JSON.stringify(appData, null, 2);
-      const modal = document.getElementById('jsonInspectorModal');
+    let currentSqlTable = 'habits';
+
+    function openSqlInspector() {
+      document.getElementById('sqlModalDbName').textContent = fileHandle ? fileHandle.name : 'habits.db (RAM)';
+      switchSqlTab('tables');
+      renderSqlTablesView();
+      const modal = document.getElementById('sqlInspectorModal');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
     }
 
-    function closeJsonInspector() {
-      const modal = document.getElementById('jsonInspectorModal');
+    function closeSqlInspector() {
+      const modal = document.getElementById('sqlInspectorModal');
       modal.classList.add('hidden');
       modal.classList.remove('flex');
     }
 
-    function copyRawJson() {
-      navigator.clipboard.writeText(JSON.stringify(appData, null, 2));
-      showToast('JSON copié dans le presse-papiers !', 'success');
+    function switchSqlTab(tab) {
+      const btnTables = document.getElementById('tabBtnTables');
+      const btnQuery = document.getElementById('tabBtnQuery');
+      const btnDump = document.getElementById('tabBtnDump');
+      const viewTables = document.getElementById('sqlViewTables');
+      const viewQuery = document.getElementById('sqlViewQuery');
+      const viewDump = document.getElementById('sqlViewDump');
+
+      [viewTables, viewQuery, viewDump].forEach(v => v.classList.add('hidden'));
+      [btnTables, btnQuery, btnDump].forEach(b => {
+        b.className = 'px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition';
+      });
+
+      if (tab === 'tables') {
+        viewTables.classList.remove('hidden');
+        btnTables.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20';
+        renderSqlTablesView();
+      } else if (tab === 'query') {
+        viewQuery.classList.remove('hidden');
+        btnQuery.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20';
+      } else if (tab === 'dump') {
+        viewDump.classList.remove('hidden');
+        btnDump.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20';
+        generateSqlDump();
+      }
     }
 
+    function renderSqlTablesView() {
+      if (!sqliteDb) return;
+      const tables = ['habits', 'logs', 'categories', 'settings'];
+      const pillsContainer = document.getElementById('sqlTableSelectorPills');
+
+      pillsContainer.innerHTML = tables.map(t => `
+        <button
+          onclick="selectSqlTable('${t}')"
+          class="px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+            currentSqlTable === t
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+          }"
+        >
+          ${t}
+        </button>
+      `).join('');
+
+      // Charger le contenu de la table courante
+      try {
+        const countRes = sqliteDb.exec(`SELECT count(*) FROM ${currentSqlTable}`);
+        const totalCount = countRes[0]?.values[0][0] || 0;
+        document.getElementById('sqlTableCountLabel').textContent = `${totalCount} enregistrement(s)`;
+
+        const dataRes = sqliteDb.exec(`SELECT * FROM ${currentSqlTable} LIMIT 100`);
+        const thead = document.getElementById('sqlTableThead');
+        const tbody = document.getElementById('sqlTableTbody');
+
+        if (dataRes.length === 0 || !dataRes[0].values) {
+          thead.innerHTML = `<tr><th class="py-2.5 px-3">Table vide</th></tr>`;
+          tbody.innerHTML = `<tr><td class="py-4 px-3 text-slate-400">Aucune donnée trouvée dans ${currentSqlTable}.</td></tr>`;
+          return;
+        }
+
+        const cols = dataRes[0].columns;
+        thead.innerHTML = `<tr>${cols.map(c => `<th class="py-2.5 px-3 uppercase tracking-wider">${c}</th>`).join('')}</tr>`;
+
+        tbody.innerHTML = dataRes[0].values.map(row => `
+          <tr class="hover:bg-slate-100/50 dark:hover:bg-slate-800/40">
+            ${row.map(val => `<td class="py-2 px-3 text-slate-700 dark:text-slate-300 truncate max-w-[200px]">${escapeHtml(val ?? 'NULL')}</td>`).join('')}
+          </tr>
+        `).join('');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function selectSqlTable(tableName) {
+      currentSqlTable = tableName;
+      renderSqlTablesView();
+    }
+
+    function setQueryExample(sql) {
+      document.getElementById('customSqlTextarea').value = sql;
+      runCustomQuery();
+    }
+
+    function runCustomQuery() {
+      if (!sqliteDb) return;
+      const sql = document.getElementById('customSqlTextarea').value.trim();
+      const resultBox = document.getElementById('customQueryResultBox');
+
+      if (!sql) return;
+
+      try {
+        const start = performance.now();
+        const res = sqliteDb.exec(sql);
+        const duration = (performance.now() - start).toFixed(2);
+
+        if (res.length === 0) {
+          resultBox.innerHTML = `
+            <div class="p-3 text-emerald-500 font-mono text-xs">
+              <i class="fa-solid fa-circle-check mr-1"></i> Requête exécutée avec succès en ${duration} ms (0 ligne retournée).
+            </div>
+          `;
+          syncStateFromSQLite();
+          renderAll();
+          return;
+        }
+
+        const cols = res[0].columns;
+        const rows = res[0].values;
+
+        resultBox.innerHTML = `
+          <div class="mb-2 text-[11px] text-slate-400 flex items-center justify-between">
+            <span>${rows.length} résultat(s) retourné(s) en ${duration} ms</span>
+          </div>
+          <table class="w-full text-left font-mono border-collapse">
+            <thead class="sticky top-0 bg-slate-200 dark:bg-slate-800 text-[10px] uppercase text-slate-600 dark:text-slate-300">
+              <tr>${cols.map(c => `<th class="py-1.5 px-2">${c}</th>`).join('')}</tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 dark:divide-slate-800 text-[11px]">
+              ${rows.map(r => `
+                <tr class="hover:bg-slate-100 dark:hover:bg-slate-800/60">
+                  ${r.map(v => `<td class="py-1 px-2 text-slate-800 dark:text-slate-200">${escapeHtml(v ?? 'NULL')}</td>`).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+
+        // Si la requête a modifié des données, resynchroniser
+        if (/INSERT|UPDATE|DELETE|DROP|ALTER/i.test(sql)) {
+          persistData('custom-query');
+          syncStateFromSQLite();
+          renderAll();
+        }
+      } catch (err) {
+        resultBox.innerHTML = `
+          <div class="p-3 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20 font-mono text-xs">
+            <div class="font-bold mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Erreur SQL :</div>
+            <div>${escapeHtml(err.message)}</div>
+          </div>
+        `;
+      }
+    }
+
+    // Raccourci Ctrl+Entrée pour exécuter le SQL
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        const textarea = document.getElementById('customSqlTextarea');
+        if (document.activeElement === textarea) {
+          e.preventDefault();
+          runCustomQuery();
+        }
+      }
+    });
+
+    function generateSqlDump() {
+      if (!sqliteDb) return;
+      let dump = `-- =========================================================================\n`;
+      dump += `-- HabitFlow v3.0 — SQLite Database Dump\n`;
+      dump += `-- Généré le : ${new Date().toISOString()}\n`;
+      dump += `-- =========================================================================\n\n`;
+
+      const tables = ['settings', 'categories', 'habits', 'logs'];
+      tables.forEach(table => {
+        try {
+          const schemaRes = sqliteDb.exec(`SELECT sql FROM sqlite_master WHERE type='table' AND name='${table}'`);
+          if (schemaRes.length > 0 && schemaRes[0].values) {
+            dump += `${schemaRes[0].values[0][0]};\n\n`;
+          }
+
+          const dataRes = sqliteDb.exec(`SELECT * FROM ${table}`);
+          if (dataRes.length > 0 && dataRes[0].values.length > 0) {
+            const cols = dataRes[0].columns.join(', ');
+            dataRes[0].values.forEach(row => {
+              const vals = row.map(v => {
+                if (v === null) return 'NULL';
+                if (typeof v === 'number') return v;
+                return `'${String(v).replace(/'/g, "''")}'`;
+              }).join(', ');
+              dump += `INSERT INTO ${table} (${cols}) VALUES (${vals});\n`;
+            });
+            dump += '\n';
+          }
+        } catch (e) {
+          console.warn('Erreur dump table', table, e);
+        }
+      });
+
+      document.getElementById('sqlDumpPre').textContent = dump;
+    }
+
+    function copySqlDump() {
+      const dump = document.getElementById('sqlDumpPre').textContent;
+      navigator.clipboard.writeText(dump);
+      showToast('Dump SQL copié dans le presse-papiers !', 'success');
+    }
+
+    /*************************************************************************
+     * 11. THÈME & NOTIFICATIONS TOAST
+     *************************************************************************/
     function applyThemeFromState() {
       const isDark = appData.settings?.theme !== 'light';
       document.documentElement.classList.toggle('dark', isDark);
@@ -1742,10 +2384,13 @@
 
     async function toggleTheme() {
       const isDark = document.documentElement.classList.toggle('dark');
+      if (sqliteDb) {
+        sqliteDb.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('theme', ?)", [isDark ? 'dark' : 'light']);
+        await persistData('theme');
+      }
       if (!appData.settings) appData.settings = {};
       appData.settings.theme = isDark ? 'dark' : 'light';
       document.getElementById('themeIcon').className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
-      await persistData('theme');
       renderCharts();
     }
 
@@ -1784,10 +2429,65 @@
       renderCharts();
     }
 
-    // Initialisation au chargement
-    window.addEventListener('DOMContentLoaded', () => {
-      applyThemeFromState();
-      renderAll();
+    /*************************************************************************
+     * 12. INITIALISATION AU DÉMARRAGE (BOOTSTRAP SQLITE)
+     *************************************************************************/
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const engine = await getSqlJsEngine();
+
+        // 1. Tenter de restaurer la poignée de fichier physique enregistrée dans IndexedDB
+        let restoredFileHandle = false;
+        try {
+          const savedHandle = await idbGet('saved_sqlite_file_handle');
+          if (savedHandle && window.showOpenFilePicker) {
+            // Vérifier les permissions
+            const perm = await savedHandle.queryPermission({ mode: 'readwrite' });
+            if (perm === 'granted') {
+              fileHandle = savedHandle;
+              const file = await fileHandle.getFile();
+              const arrayBuffer = await file.arrayBuffer();
+              const uint8 = new Uint8Array(arrayBuffer);
+              if (uint8.length > 0) {
+                sqliteDb = new engine.Database(uint8);
+                initSqliteSchema(sqliteDb);
+                updateStorageBadge(true, file.name);
+                restoredFileHandle = true;
+              }
+            } else {
+              // Permission en attente : badge cliquable pour réactiver d'un geste
+              const badgeText = document.getElementById('storageStatusText');
+              if (badgeText) badgeText.textContent = `Cliquez pour reconnecter ${savedHandle.name}`;
+            }
+          }
+        } catch (e) {
+          console.warn('Reconnexion automatique du fichier ignorée', e);
+        }
+
+        // 2. Si pas de fichier physique direct, restaurer depuis le cache binaire IndexedDB
+        if (!restoredFileHandle) {
+          const cachedBinary = await idbGet('cached_sqlite_binary');
+          if (cachedBinary && cachedBinary.length > 0) {
+            sqliteDb = new engine.Database(new Uint8Array(cachedBinary));
+            initSqliteSchema(sqliteDb);
+            updateStorageBadge(false);
+          } else {
+            // 3. Base vierge : initialiser les tables et données de démonstration
+            sqliteDb = new engine.Database();
+            initSqliteSchema(sqliteDb);
+            importJsonIntoSQLite(getDefaultData());
+            await persistData('bootstrap-default');
+            updateStorageBadge(false);
+          }
+        }
+
+        syncStateFromSQLite();
+        applyThemeFromState();
+        renderAll();
+      } catch (err) {
+        console.error('Erreur démarrage SQLite :', err);
+        showToast('Impossible d’initialiser le moteur SQLite WebAssembly.', 'error');
+      }
     });
   </script>
 </body>
