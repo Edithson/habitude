@@ -1,0 +1,153 @@
+{
+  "version": "2.0",
+  "updatedAt": "2026-10-15T08:02:28.484Z",
+  "settings": {
+    "theme": "dark"
+  },
+  "categories": [
+    {
+      "id": "cat_abstinence",
+      "name": "Abstinence & Sobriété",
+      "color": "#10b981",
+      "icon": "fa-shield-halved"
+    },
+    {
+      "id": "cat_sante",
+      "name": "Santé & Énergie",
+      "color": "#3b82f6",
+      "icon": "fa-heart-pulse"
+    },
+    {
+      "id": "cat_mental",
+      "name": "Mental & Focus",
+      "color": "#8b5cf6",
+      "icon": "fa-brain"
+    },
+    {
+      "id": "cat_projets",
+      "name": "Projets & Code",
+      "color": "#f59e0b",
+      "icon": "fa-laptop-code"
+    }
+  ],
+  "habits": [
+    {
+      "id": "hab_abstinence_1",
+      "name": "Objectif Abstinence (Zéro écart)",
+      "type": "abstinence",
+      "categoryId": "cat_abstinence",
+      "target": 7,
+      "color": "#10b981",
+      "icon": "fa-shield-halved",
+      "createdAt": "2026-10-05"
+    },
+    {
+      "id": "hab_2",
+      "name": "Session Deep Work (Sans distraction)",
+      "type": "action",
+      "categoryId": "cat_projets",
+      "target": 5,
+      "color": "#f59e0b",
+      "icon": "fa-laptop-code",
+      "createdAt": "2026-10-05"
+    },
+    {
+      "id": "hab_3",
+      "name": "Exercice physique / Étirements 20 min",
+      "type": "action",
+      "categoryId": "cat_sante",
+      "target": 4,
+      "color": "#3b82f6",
+      "icon": "fa-dumbbell",
+      "createdAt": "2026-10-05"
+    },
+    {
+      "id": "hab_4",
+      "name": "Lecture ou veille calme le soir",
+      "type": "action",
+      "categoryId": "cat_mental",
+      "target": 5,
+      "color": "#8b5cf6",
+      "icon": "fa-book-open",
+      "createdAt": "2026-10-05"
+    }
+  ],
+  "history": {
+    "2026-10-12": {
+      "hab_abstinence_1": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "hab_2": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "hab_3": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "hab_4": [
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false
+      ]
+    },
+    "2026-10-05": {
+      "hab_abstinence_1": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "hab_2": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "hab_3": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "hab_4": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  }
+}
